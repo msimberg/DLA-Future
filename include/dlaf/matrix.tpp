@@ -19,7 +19,7 @@ Matrix<T, device>::Matrix(const GlobalElementSize& size, const TileElementSize& 
 
 template <class T, Device device>
 Matrix<T, device>::Matrix(matrix::Distribution&& distribution)
-    : Matrix<const T, device>(std::move(distribution), {}, {}) {
+    : Matrix<const T, device>(std::move(distribution), {}) {
   const SizeType alignment = 64;
   const SizeType ld =
       std::max<SizeType>(1,
@@ -35,7 +35,7 @@ Matrix<T, device>::Matrix(matrix::Distribution&& distribution)
 
 template <class T, Device device>
 Matrix<T, device>::Matrix(matrix::Distribution&& distribution, const matrix::LayoutInfo& layout)
-    : Matrix<const T, device>(std::move(distribution), {}, {}) {
+    : Matrix<const T, device>(std::move(distribution), {}) {
   if (this->distribution().localSize() != layout.size())
     throw std::invalid_argument("Error: distribution.localSize() != layout.size()");
   if (this->blockSize() != layout.blockSize())
@@ -58,18 +58,5 @@ Matrix<T, device>::Matrix(const matrix::LayoutInfo& layout, ElementType* ptr)
 template <class T, Device device>
 hpx::future<Tile<T, device>> Matrix<T, device>::operator()(const LocalTileIndex& index) noexcept {
   std::size_t i = tileLinearIndex(index);
-  hpx::future<TileType> old_future = std::move(tile_futures_[i]);
-  hpx::promise<TileType> p;
-  tile_futures_[i] = p.get_future();
-  tile_shared_futures_[i] = {};
-  return old_future.then(hpx::launch::sync, [p = std::move(p)](hpx::future<TileType>&& fut) mutable {
-    try {
-      return std::move(fut.get().setPromise(std::move(p)));
-    }
-    catch (...) {
-      auto current_exception_ptr = std::current_exception();
-      p.set_exception(current_exception_ptr);
-      std::rethrow_exception(current_exception_ptr);
-    }
-  });
+  return matrix::internal::getRWTileFuture(tile_managers_[i]);
 }
