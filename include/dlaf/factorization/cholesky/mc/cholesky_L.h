@@ -99,6 +99,8 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
   constexpr auto NoTrans = blas::Op::NoTrans;
   constexpr auto Right = blas::Side::Right;
   constexpr auto Lower = blas::Uplo::Lower;
+  using TileType = typename Matrix<T, Device::CPU>::TileType;
+  using ConstTileType = typename Matrix<T, Device::CPU>::ConstTileType;
 
   // Set up executor on the default queue with high priority.
   pool_executor executor_hp("default", thread_priority_high);
@@ -121,7 +123,7 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
 
   for (SizeType k = 0; k < nrtile; ++k) {
     // Create a placeholder that will store the shared futures representing the panel
-    vector<hpx::shared_future<Tile<const T, Device::CPU>>> panel(distr.localNrTiles().rows());
+    vector<hpx::shared_future<ConstTileType>> panel(distr.localNrTiles().rows());
 
     auto k_rank_row = distr.rankGlobalTile<Coord::Row>(k);
     auto k_rank_col = distr.rankGlobalTile<Coord::Col>(k);
@@ -129,7 +131,7 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
     if (mat_a.rankIndex().col() == k_rank_col) {
       auto k_local_col = distr.localTileFromGlobalTile<Coord::Col>(k);
 
-      hpx::shared_future<Tile<const T, Device::CPU>> kk_tile;
+      hpx::shared_future<ConstTileType> kk_tile;
 
       if (mat_a.rankIndex().row() == k_rank_row) {
         auto k_local_row = distr.localTileFromGlobalTile<Coord::Row>(k);
@@ -159,10 +161,10 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
           kk_tile = hpx::dataflow(  //
               executor_mpi,
               hpx::util::unwrapping(
-                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> ConstTileType {
                     memory::MemoryView<T, Device::CPU> mem_view(
                         util::size_t::mul(tile_size.rows(), tile_size.cols()));
-                    Tile<T, Device::CPU> tile(tile_size, std::move(mem_view), tile_size.rows());
+                    TileType tile(tile_size, std::move(mem_view), tile_size.rows());
                     comm::sync::broadcast::receive_from(index, comm_wrapper().colCommunicator(), tile);
                     return std::move(tile);
                   }),
@@ -201,10 +203,10 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
           panel[i_local] = hpx::dataflow(  //
               executor_mpi,
               hpx::util::unwrapping(
-                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> ConstTileType {
                     memory::MemoryView<T, Device::CPU> mem_view(
                         util::size_t::mul(tile_size.rows(), tile_size.cols()));
-                    Tile<T, Device::CPU> tile(tile_size, std::move(mem_view), tile_size.rows());
+                    TileType tile(tile_size, std::move(mem_view), tile_size.rows());
                     comm::sync::broadcast::receive_from(index, comm_wrapper().rowCommunicator(), tile);
                     return std::move(tile);
                   }),
@@ -226,7 +228,7 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
       //        auto trailing_matrix_executor = (j_local == nextlocaltilek) ? executor_hp :
       //        executor_normal;
 
-      hpx::shared_future<Tile<const T, Device::CPU>> col_panel;
+      hpx::shared_future<ConstTileType> col_panel;
 
       auto j_rank_row = distr.rankGlobalTile<Coord::Row>(j);
 
@@ -257,10 +259,10 @@ void cholesky_L(comm::CommunicatorGrid grid, Matrix<T, Device::CPU>& mat_a) {
           col_panel = hpx::dataflow(  //
               executor_mpi,
               hpx::util::unwrapping(
-                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                  [](auto index, auto&& tile_size, auto&& comm_wrapper) -> ConstTileType {
                     memory::MemoryView<T, Device::CPU> mem_view(
                         util::size_t::mul(tile_size.rows(), tile_size.cols()));
-                    Tile<T, Device::CPU> tile(tile_size, std::move(mem_view), tile_size.rows());
+                    TileType tile(tile_size, std::move(mem_view), tile_size.rows());
                     comm::sync::broadcast::receive_from(index, comm_wrapper().colCommunicator(), tile);
                     return std::move(tile);
                   }),
