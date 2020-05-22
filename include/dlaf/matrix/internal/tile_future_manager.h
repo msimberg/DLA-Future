@@ -51,7 +51,7 @@ public:
 
   hpx::shared_future<ConstTileType> getReadTileSharedFuture() noexcept {
     if (!tile_shared_future_.valid()) {
-      tile_shared_future_ = std::move(getTileFuture<ConstTileType>(tile_future_));
+      tile_shared_future_ = getTileFuture<ConstTileType>(tile_future_);
     }
     return tile_shared_future_;
   }
@@ -194,8 +194,8 @@ private:
     // be replaced with the futures of the promises of *this.
     // Therefore we first set up the futures for tile_manager in *this
     // and then swap the base class members (i.e. the futures).
-    tile_future_ = std::move(tile_promise_.get_future());
-    tile_shared_future_ = std::move(tile_shared_promise_.get_future());
+    tile_future_ = tile_promise_.get_future();
+    tile_shared_future_ = tile_shared_promise_.get_future();
 
     TileManagerType& base = *this;
     std::swap(tile_manager, base);
