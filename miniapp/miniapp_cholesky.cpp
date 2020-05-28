@@ -71,6 +71,7 @@ struct options_t {
   int grid_cols;
   int64_t nruns;
   CHECK_RESULT do_check;
+  int pool;
 };
 
 /// Handle CLI options
@@ -91,7 +92,7 @@ int hpx_main(hpx::program_options::variables_map& vm) {
   MatrixType matrix(matrix_size, block_size, comm_grid);
   const auto& distribution = matrix.distribution();
 
-  dlaf::common::Pool<TileType> pool(1000, matrix.blockSize());
+  dlaf::common::Pool<TileType> pool(opts.pool, matrix.blockSize());
 
   for (auto run_index = 0; run_index < opts.nruns; ++run_index) {
     if (0 == world.rank())
@@ -174,6 +175,7 @@ int main(int argc, char** argv) {
     ("grid-cols",    value<int>()        ->default_value(   1),                        "Number of column processes in the 2D communicator")
     ("nruns",        value<int64_t>()    ->default_value(   1),                        "Number of runs to compute the cholesky")
     ("check-result", value<std::string>()->default_value(  "")->implicit_value("all"), "Enable result check ('all', 'last')")
+    ("pool",         value<int>()        ->default_value(100),                         "Tile pool size")
   ;
   // clang-format on
 
@@ -461,6 +463,7 @@ options_t check_options(hpx::program_options::variables_map& vm) {
       vm["grid-rows"].as<int>(),        vm["grid-cols"].as<int>(),
 
       vm["nruns"].as<int64_t>(),        CHECK_RESULT::NONE,
+      vm["pool"].as<int>()
   };
 
   if (opts.m <= 0)
