@@ -32,7 +32,8 @@ void Factorization<Backend::MC>::cholesky(blas::Uplo uplo, Matrix<T, Device::CPU
 }
 
 template <class T>
-void Factorization<Backend::MC>::cholesky(comm::CommunicatorGrid grid, blas::Uplo uplo,
+void Factorization<Backend::MC>::cholesky(common::Pool<Tile<T, Device::CPU>>& pool,
+                                          comm::CommunicatorGrid grid, blas::Uplo uplo,
                                           Matrix<T, Device::CPU>& mat_a) {
   // Check if matrix is square
   DLAF_ASSERT_SIZE_SQUARE(mat_a);
@@ -43,9 +44,8 @@ void Factorization<Backend::MC>::cholesky(comm::CommunicatorGrid grid, blas::Upl
 
   // Method only for Lower triangular matrix
   if (uplo == blas::Uplo::Lower)
-    internal::mc::cholesky_L(grid, mat_a);
+    internal::mc::cholesky_L(pool, grid, mat_a);
   else
     throw std::runtime_error("uplo = Upper not yet implemented");
 }
-
 }
