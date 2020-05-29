@@ -93,6 +93,12 @@ int hpx_main(hpx::program_options::variables_map& vm) {
   const auto& distribution = matrix.distribution();
 
   dlaf::common::Pool<TileType> pool(opts.pool, matrix.blockSize());
+  dlaf::TileGetter<T, Device::CPU> get_resource = [&pool](const TileElementSize tile_size) {
+    auto tile = pool.get().get();
+    DLAF_ASSERT(tile_size == tile.size(), "this pool provides cannot provide a tile ", tile_size,
+                " but just ", tile.size());
+    return tile;
+  };
 
   for (auto run_index = 0; run_index < opts.nruns; ++run_index) {
     if (0 == world.rank())
@@ -109,7 +115,7 @@ int hpx_main(hpx::program_options::variables_map& vm) {
     }
 
     dlaf::common::Timer<> timeit;
-    dlaf::Factorization<Backend::MC>::cholesky(pool, comm_grid, blas::Uplo::Lower, matrix);
+    dlaf::Factorization<Backend::MC>::cholesky(get_resource, comm_grid, blas::Uplo::Lower, matrix);
 
     // wait for last task and barrier for all ranks
     {
@@ -458,13 +464,14 @@ void check_cholesky(MatrixType& A, MatrixType& L, CommunicatorGrid comm_grid) {
 }
 
 options_t check_options(hpx::program_options::variables_map& vm) {
-  options_t opts = {
-      vm["matrix-size"].as<SizeType>(), vm["block-size"].as<SizeType>(),
-      vm["grid-rows"].as<int>(),        vm["grid-cols"].as<int>(),
+  options_t opts = {vm["matrix-size"].as<SizeType>(),
+                    vm["block-size"].as<SizeType>(),
+                    vm["grid-rows"].as<int>(),
+                    vm["grid-cols"].as<int>(),
 
-      vm["nruns"].as<int64_t>(),        CHECK_RESULT::NONE,
-      vm["pool"].as<int>()
-  };
+                    vm["nruns"].as<int64_t>(),
+                    CHECK_RESULT::NONE,
+                    vm["pool"].as<int>()};
 
   if (opts.m <= 0)
     throw std::runtime_error("matrix size must be a positive number");

@@ -135,7 +135,14 @@ TYPED_TEST(CholeskyDistributedTest, Correctness) {
         Matrix<TypeParam, Device::CPU> mat(std::move(distribution));
         set(mat, el);
 
-        Factorization<Backend::MC>::cholesky(comm_grid, blas::Uplo::Lower, mat);
+        dlaf::TileGetter<TypeParam, Device::CPU> get_resource = [](const TileElementSize tile_size) {
+          dlaf::memory::MemoryView<TypeParam, Device::CPU> mem_view(
+              dlaf::util::size_t::mul(tile_size.rows(), tile_size.cols()));
+          dlaf::Tile<TypeParam, Device::CPU> tile(tile_size, std::move(mem_view), tile_size.rows());
+          return tile;
+        };
+
+        Factorization<Backend::MC>::cholesky(get_resource, comm_grid, blas::Uplo::Lower, mat);
 
         CHECK_MATRIX_NEAR(res, mat, 4 * (mat.size().rows() + 1) * TypeUtilities<TypeParam>::error,
                           4 * (mat.size().rows() + 1) * TypeUtilities<TypeParam>::error);

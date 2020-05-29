@@ -10,10 +10,11 @@
 #pragma once
 
 #include <blas.hh>
-#include "dlaf/common/pool/pool_tile.h"
+
 #include "dlaf/communication/communicator_grid.h"
 #include "dlaf/factorization/internal.h"
 #include "dlaf/matrix.h"
+#include "dlaf/tile.h"
 #include "dlaf/types.h"
 
 namespace dlaf {
@@ -51,7 +52,7 @@ struct Factorization<Backend::MC> {
   /// @pre mat_a has a square block size
   /// @pre mat_a is distributed according to grid.
   template <class T>
-  static void cholesky(common::Pool<Tile<T, Device::CPU>>& pool, comm::CommunicatorGrid grid,
+  static void cholesky(TileGetter<T, Device::CPU> get_resource, comm::CommunicatorGrid grid,
                        blas::Uplo uplo, Matrix<T, Device::CPU>& mat_a);
 };
 
@@ -62,12 +63,12 @@ struct Factorization<Backend::MC> {
 /// ---- ETI
 namespace dlaf {
 
-#define DLAF_CHOLESKY_ETI(KWORD, DATATYPE)                                                   \
-  KWORD template void                                                                        \
-  Factorization<Backend::MC>::cholesky<DATATYPE>(common::Pool<Tile<DATATYPE, Device::CPU>>&, \
-                                                 comm::CommunicatorGrid, blas::Uplo,         \
-                                                 Matrix<DATATYPE, Device::CPU>&);            \
-  KWORD template void Factorization<Backend::MC>::cholesky<DATATYPE>(blas::Uplo,             \
+#define DLAF_CHOLESKY_ETI(KWORD, DATATYPE)                                                              \
+  KWORD template void Factorization<Backend::MC>::cholesky<DATATYPE>(TileGetter<DATATYPE, Device::CPU>, \
+                                                                     comm::CommunicatorGrid,            \
+                                                                     blas::Uplo,                        \
+                                                                     Matrix<DATATYPE, Device::CPU>&);   \
+  KWORD template void Factorization<Backend::MC>::cholesky<DATATYPE>(blas::Uplo,                        \
                                                                      Matrix<DATATYPE, Device::CPU>&);
 
 DLAF_CHOLESKY_ETI(extern, float)

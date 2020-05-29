@@ -11,6 +11,8 @@
 #pragma once
 
 #include <exception>
+#include <functional>
+
 #include <hpx/hpx.hpp>
 
 #include "dlaf/common/data_descriptor.h"
@@ -188,6 +190,10 @@ auto create_data(const Tile<T, device>& tile) {
   return common::DataDescriptor<T>(tile.ptr({0, 0}), to_sizet(tile.size().cols()),
                                    to_sizet(tile.size().rows()), to_sizet(tile.ld()));
 }
+
+/// Function type that return a Tile
+template <class T, Device device>
+using TileGetter = std::function<Tile<T, device>(TileElementSize)>;
 
 #include <dlaf/tile.tpp>
 

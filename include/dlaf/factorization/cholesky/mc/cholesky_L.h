@@ -15,7 +15,6 @@
 #include "dlaf/blas_tile.h"
 #include "dlaf/common/index2d.h"
 #include "dlaf/common/pipeline.h"
-#include "dlaf/common/pool/pool_tile.h"
 #include "dlaf/common/range2d.h"
 #include "dlaf/common/vector.h"
 #include "dlaf/communication/communicator_grid.h"
@@ -86,7 +85,7 @@ void cholesky_L(Matrix<T, Device::CPU>& mat_a) {
 
 // Distributed implementation of Lower Cholesky factorization.
 template <class T>
-void cholesky_L(dlaf::common::Pool<Tile<T, Device::CPU>>& pool, comm::CommunicatorGrid grid,
+void cholesky_L(TileGetter<T, Device::CPU> get_resource, comm::CommunicatorGrid grid,
                 Matrix<T, Device::CPU>& mat_a) {
   using common::internal::vector;
 
@@ -160,10 +159,9 @@ void cholesky_L(dlaf::common::Pool<Tile<T, Device::CPU>>& pool, comm::Communicat
           // Receive the diagonal tile
           kk_tile = hpx::dataflow(  //
               executor_mpi,
-              hpx::util::unwrapping([&pool](auto index, auto&& tile_size,
-                                            auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
-                Tile<T, Device::CPU> tile = pool.get().get();
-                DLAF_ASSERT(tile_size == tile.size(), "no 1");
+              hpx::util::unwrapping([get_resource](auto index, auto&& tile_size,
+                                                   auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                Tile<T, Device::CPU> tile = get_resource(tile_size);
                 comm::sync::broadcast::receive_from(index, comm_wrapper().colCommunicator(), tile);
                 return std::move(tile);
               }),
@@ -201,10 +199,9 @@ void cholesky_L(dlaf::common::Pool<Tile<T, Device::CPU>>& pool, comm::Communicat
           // Receiving the panel
           panel[i_local] = hpx::dataflow(  //
               executor_mpi,
-              hpx::util::unwrapping([&pool](auto index, auto&& tile_size,
-                                            auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
-                Tile<T, Device::CPU> tile = pool.get().get();
-                DLAF_ASSERT(tile_size == tile.size(), "no 2");
+              hpx::util::unwrapping([get_resource](auto index, auto&& tile_size,
+                                                   auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                Tile<T, Device::CPU> tile = get_resource(tile_size);
                 comm::sync::broadcast::receive_from(index, comm_wrapper().rowCommunicator(), tile);
                 return std::move(tile);
               }),
@@ -256,10 +253,9 @@ void cholesky_L(dlaf::common::Pool<Tile<T, Device::CPU>>& pool, comm::Communicat
           // Update the (trailing) panel column-wise
           col_panel = hpx::dataflow(  //
               executor_mpi,
-              hpx::util::unwrapping([&pool](auto index, auto&& tile_size,
-                                            auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
-                Tile<T, Device::CPU> tile = pool.get().get();
-                DLAF_ASSERT(tile_size == tile.size(), "no 3");
+              hpx::util::unwrapping([get_resource](auto index, auto&& tile_size,
+                                                   auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
+                Tile<T, Device::CPU> tile = get_resource(tile_size);
                 comm::sync::broadcast::receive_from(index, comm_wrapper().colCommunicator(), tile);
                 return std::move(tile);
               }),
