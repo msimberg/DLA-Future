@@ -10,7 +10,7 @@
 #pragma once
 
 #include <blas.hh>
-#include "dlaf/common/pool.h"
+#include "dlaf/common/pool/pool_tile.h"
 #include "dlaf/communication/communicator_grid.h"
 #include "dlaf/factorization/internal.h"
 #include "dlaf/matrix.h"

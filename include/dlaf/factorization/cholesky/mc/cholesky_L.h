@@ -15,7 +15,7 @@
 #include "dlaf/blas_tile.h"
 #include "dlaf/common/index2d.h"
 #include "dlaf/common/pipeline.h"
-#include "dlaf/common/pool.h"
+#include "dlaf/common/pool/pool_tile.h"
 #include "dlaf/common/range2d.h"
 #include "dlaf/common/vector.h"
 #include "dlaf/communication/communicator_grid.h"
@@ -259,7 +259,7 @@ void cholesky_L(dlaf::common::Pool<Tile<T, Device::CPU>>& pool, comm::Communicat
               hpx::util::unwrapping([&pool](auto index, auto&& tile_size,
                                             auto&& comm_wrapper) -> Tile<const T, Device::CPU> {
                 Tile<T, Device::CPU> tile = pool.get().get();
-                DLAF_ASSERT(tile_size == tile.size(), "no no no");
+                DLAF_ASSERT(tile_size == tile.size(), "no 3");
                 comm::sync::broadcast::receive_from(index, comm_wrapper().colCommunicator(), tile);
                 return std::move(tile);
               }),
