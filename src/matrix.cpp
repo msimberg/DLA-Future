@@ -1,5 +1,8 @@
 #include <dlaf/matrix.h>
 
+#include "dlaf/matrix.tpp"
+#include "dlaf/matrix_const.tpp"
+
 namespace dlaf {
 namespace matrix {
 

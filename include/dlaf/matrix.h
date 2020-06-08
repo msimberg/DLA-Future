@@ -359,6 +359,3 @@ DLAF_MATRIX_ETI(extern, std::complex<double>, Device::CPU)
 /// Make dlaf::matrix::Matrix available as dlaf::Matrix.
 using matrix::Matrix;
 }
-
-#include "dlaf/matrix.tpp"
-#include "dlaf/matrix_const.tpp"

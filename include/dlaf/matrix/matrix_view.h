@@ -36,7 +36,11 @@ public:
   using ConstTileType = Tile<const ElementType, device>;
 
   template <template <class, Device> class MatrixType>
-  MatrixView(blas::Uplo uplo, MatrixType<T, device>& matrix, bool force_RW);
+  MatrixView(blas::Uplo uplo, MatrixType<T, device>& matrix, bool force_RW) : MatrixBase(matrix) {
+    if (uplo != blas::Uplo::General)
+      throw std::invalid_argument("uplo != General not implemented yet.");
+    setUpTiles(matrix, force_RW);
+  }
 
   MatrixView(const MatrixView& rhs) = delete;
   MatrixView(MatrixView&& rhs) = default;
@@ -122,10 +126,27 @@ private:
   template <template <class, Device> class MatrixType>
   void setUpTiles(MatrixType<T, device>& matrix, bool force_RW) noexcept;
 
-  internal::ViewTileFutureManager<T, device>& tileManager(const LocalTileIndex& index);
+  internal::ViewTileFutureManager<T, device>& tileManager(const LocalTileIndex& index) {
+    std::size_t i = tileLinearIndex(index);
+    return tile_managers_[i];
+  }
 
   std::vector<internal::ViewTileFutureManager<T, device>> tile_managers_;
 };
+
+template <class T, Device device>
+template <template <class, Device> class MatrixType>
+void MatrixView<T, device>::setUpTiles(MatrixType<T, device>& matrix, bool force_RW) noexcept {
+  const auto& nr_tiles = matrix.distribution().localNrTiles();
+  tile_managers_.reserve(futureVectorSize(nr_tiles));
+
+  for (SizeType j = 0; j < nr_tiles.cols(); ++j) {
+    for (SizeType i = 0; i < nr_tiles.rows(); ++i) {
+      LocalTileIndex ind(i, j);
+      tile_managers_.emplace_back(matrix.tileManager(ind), force_RW);
+    }
+  }
+}
 
 template <template <class, Device> class MatrixType, class T, Device device,
           std::enable_if_t<!std::is_const<T>::value, int> = 0>
@@ -148,7 +169,11 @@ public:
 
   template <template <class, Device> class MatrixType, class T2,
             std::enable_if_t<std::is_same<T, std::remove_const_t<T2>>::value, int> = 0>
-  MatrixView(blas::Uplo uplo, MatrixType<T2, device>& matrix, bool force_R);
+  MatrixView(blas::Uplo uplo, MatrixType<T2, device>& matrix, bool force_R) : MatrixBase(matrix) {
+    if (uplo != blas::Uplo::General)
+      throw std::invalid_argument("uplo != General not implemented yet.");
+    setUpTiles(matrix, force_R);
+  }
 
   MatrixView(const MatrixView& rhs) = delete;
   MatrixView(MatrixView&& rhs) = default;
@@ -200,6 +225,24 @@ private:
   std::vector<hpx::shared_future<ConstTileType>> tile_shared_futures_;
 };
 
+template <class T, Device device>
+template <template <class, Device> class MatrixType, class T2,
+          std::enable_if_t<std::is_same<T, std::remove_const_t<T2>>::value, int>>
+void MatrixView<const T, device>::setUpTiles(MatrixType<T2, device>& matrix, bool force_R) noexcept {
+  const auto& nr_tiles = matrix.distribution().localNrTiles();
+  tile_shared_futures_.reserve(futureVectorSize(nr_tiles));
+
+  for (SizeType j = 0; j < nr_tiles.cols(); ++j) {
+    for (SizeType i = 0; i < nr_tiles.rows(); ++i) {
+      LocalTileIndex ind(i, j);
+      if (force_R)
+        assert(matrix.read(ind).valid());
+
+      tile_shared_futures_.emplace_back(std::move(matrix.read(ind)));
+    }
+  }
+}
+
 template <template <class, Device> class MatrixType, class T, Device device>
 MatrixView<std::add_const_t<T>, device> getConstView(blas::Uplo uplo, MatrixType<T, device>& matrix,
                                                      bool force_R = true) {
@@ -230,6 +273,3 @@ DLAF_MATRIXVIEW_ETI(extern, std::complex<double>, Device::CPU)
 
 }
 }
-
-#include "dlaf/matrix/matrix_view.tpp"
-#include "dlaf/matrix/matrix_view_const.tpp"
