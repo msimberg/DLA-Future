@@ -60,7 +60,7 @@ public:
   /// @pre 0 < @p index.row() < nrTiles().rows()
   /// @pre 0 < @p index.col() < nrTiles().cols()
   std::size_t tileOffset(const LocalTileIndex& index) const noexcept {
-    using util::size_t::mul;
+    using dlaf::util::size_t::mul;
     assert(index.isValid() && index.isIn(nr_tiles_));
     return mul(index.row(), tile_offset_row_) + mul(index.col(), tile_offset_col_);
   }
@@ -120,7 +120,7 @@ private:
 /// Returns LayoutInfo for a local column major matrix.
 inline LayoutInfo colMajorLayout(const LocalElementSize& size, const TileElementSize& block_size,
                                  SizeType ld) {
-  using util::size_t::mul;
+  using dlaf::util::size_t::mul;
   return LayoutInfo(size, block_size, ld, static_cast<std::size_t>(block_size.rows()),
                     mul(block_size.cols(), ld));
 }
@@ -132,7 +132,7 @@ inline LayoutInfo colMajorLayout(const matrix::Distribution& distribution, SizeT
 /// Returns LayoutInfo for a local matrix which use the tile layout (Advanced interface).
 inline LayoutInfo tileLayout(const LocalElementSize& size, const TileElementSize& block_size,
                              SizeType ld_tile, SizeType tiles_per_col) {
-  using util::size_t::mul;
+  using dlaf::util::size_t::mul;
   std::size_t tile_size = mul(ld_tile, block_size.cols());
   std::size_t row_offset = std::max<std::size_t>(1, tile_size);
   std::size_t col_offset = std::max<std::size_t>(1, mul(tile_size, tiles_per_col));
@@ -147,8 +147,9 @@ inline LayoutInfo tileLayout(const matrix::Distribution& distribution, SizeType 
 
 /// Returns LayoutInfo for a local matrix which use the tile layout (Basic interface).
 inline LayoutInfo tileLayout(const LocalElementSize& size, const TileElementSize& block_size) {
+  using dlaf::util::ceilDiv;
   SizeType ld = std::max<SizeType>(1, block_size.rows());
-  SizeType tiles_per_col = util::ceilDiv(size.rows(), block_size.rows());
+  SizeType tiles_per_col = ceilDiv(size.rows(), block_size.rows());
   return tileLayout(size, block_size, ld, tiles_per_col);
 }
 

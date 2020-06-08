@@ -79,7 +79,8 @@ protected:
   MatrixBase& operator=(MatrixBase&& rhs) = default;
 
   static std::size_t futureVectorSize(const LocalTileSize& local_nr_tiles) noexcept {
-    return util::size_t::mul(local_nr_tiles.rows(), local_nr_tiles.cols());
+    using dlaf::util::size_t::mul;
+    return mul(local_nr_tiles.rows(), local_nr_tiles.cols());
   }
 
   /// Returns the position in the vector of the index Tile.
@@ -88,8 +89,8 @@ protected:
   /// @pre index.isIn(localNrTiles()) == true.
   std::size_t tileLinearIndex(const LocalTileIndex& index) const noexcept {
     assert(index.isValid() && index.isIn(distribution_->localNrTiles()));
-    using util::size_t::sum;
-    using util::size_t::mul;
+    using dlaf::util::size_t::sum;
+    using dlaf::util::size_t::mul;
     return sum(index.row(), mul(distribution_->localNrTiles().rows(), index.col()));
   }
 

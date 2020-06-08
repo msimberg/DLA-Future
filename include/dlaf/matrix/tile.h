@@ -100,8 +100,8 @@ public:
   /// @pre index.isValid() == true.
   /// @pre index.isIn(size()) == true.
   const T* ptr(const TileElementIndex& index) const noexcept {
-    using util::size_t::sum;
-    using util::size_t::mul;
+    using dlaf::util::size_t::sum;
+    using dlaf::util::size_t::mul;
     assert(index.isValid());
     assert(index.isIn(size_));
 
@@ -176,8 +176,8 @@ public:
   /// @pre index.isValid() == true.
   /// @pre index.isIn(size()) == true.
   T* ptr(const TileElementIndex& index) const noexcept {
-    using util::size_t::sum;
-    using util::size_t::mul;
+    using dlaf::util::size_t::sum;
+    using dlaf::util::size_t::mul;
     assert(index.isValid());
     assert(index.isIn(size_));
 

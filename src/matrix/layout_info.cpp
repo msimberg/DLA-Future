@@ -19,8 +19,9 @@ LayoutInfo::LayoutInfo(const LocalElementSize& size, const TileElementSize& bloc
                        std::size_t tile_offset_row, std::size_t tile_offset_col)
     : size_(size), nr_tiles_(0, 0), block_size_(block_size), ld_tile_(tile_ld),
       tile_offset_row_(tile_offset_row), tile_offset_col_(tile_offset_col) {
-  using util::size_t::sum;
-  using util::size_t::mul;
+  using dlaf::util::size_t::sum;
+  using dlaf::util::size_t::mul;
+  using dlaf::util::ceilDiv;
 
   if (!size_.isValid()) {
     throw std::invalid_argument("Error: Invalid Matrix size");
@@ -29,8 +30,7 @@ LayoutInfo::LayoutInfo(const LocalElementSize& size, const TileElementSize& bloc
     throw std::invalid_argument("Error: Invalid Block size");
   }
 
-  nr_tiles_ = {util::ceilDiv(size_.rows(), block_size_.rows()),
-               util::ceilDiv(size_.cols(), block_size_.cols())};
+  nr_tiles_ = {ceilDiv(size_.rows(), block_size_.rows()), ceilDiv(size_.cols(), block_size_.cols())};
 
   if (size_.isEmpty()) {
     if (ld_tile_ < 1) {
@@ -74,8 +74,8 @@ std::size_t LayoutInfo::minMemSize() const noexcept {
 }
 
 std::size_t LayoutInfo::minTileMemSize(const TileElementSize& tile_size) const noexcept {
-  using util::size_t::sum;
-  using util::size_t::mul;
+  using dlaf::util::size_t::sum;
+  using dlaf::util::size_t::mul;
 
   assert(tile_size.rows() <= block_size_.rows());
   assert(tile_size.cols() <= block_size_.cols());

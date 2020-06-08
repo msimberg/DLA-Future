@@ -15,8 +15,8 @@ template <class T, Device device>
 Tile<const T, device>::Tile(const TileElementSize& size,
                             memory::MemoryView<ElementType, device>&& memory_view, SizeType ld)
     : size_(size), memory_view_(std::move(memory_view)), ld_(ld) {
-  using util::size_t::sum;
-  using util::size_t::mul;
+  using dlaf::util::size_t::sum;
+  using dlaf::util::size_t::mul;
   if (!size_.isValid())
     throw std::invalid_argument("Error: Invalid Tile sizes");
   if (ld_ < std::max<SizeType>(1, size_.rows())) {

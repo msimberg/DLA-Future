@@ -206,8 +206,9 @@ void checkFuturesDone(bool get_ready, const std::vector<Future1>& current, Matri
 template <class Future1, class MatrixViewType>
 void checkFuturesDoneWrite(bool get_ready, const std::vector<Future1>& current,
                            MatrixViewType& mat_view) {
+  using dlaf::util::size_t::mul;
   const auto& nr_tiles = mat_view.distribution().localNrTiles();
-  assert(current.size() == util::size_t::mul(nr_tiles.rows(), nr_tiles.cols()));
+  assert(current.size() == mul(nr_tiles.rows(), nr_tiles.cols()));
 
   for (std::size_t index = 0; index < current.size(); ++index) {
     EXPECT_TRUE(checkFuturesStep(get_ready ? index : 0, current));
