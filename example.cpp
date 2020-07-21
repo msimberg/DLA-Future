@@ -38,16 +38,16 @@ void print(MatrixType& matrix);
 
 void set_matrix_from_global(MatrixType& matrix, const Type* data);
 
-int miniapp(hpx::program_options::variables_map&) {
+int miniapp(hpx::program_options::variables_map& vm) {
   const SizeType n = 3;
   const SizeType nb = 1;
   const SizeType k_reflectors = 2;  // number of refelectors
 
-  auto row_comm_size = 2;
-  auto col_comm_size = 1;
+  const SizeType grid_rows = vm["grid-rows"].as<SizeType>();
+  const SizeType grid_cols = vm["grid-cols"].as<SizeType>();
 
   Communicator world(MPI_COMM_WORLD);
-  CommunicatorGrid comm_grid(world, row_comm_size, col_comm_size, dlaf::common::Ordering::ColumnMajor);
+  CommunicatorGrid comm_grid(world, grid_rows, grid_cols, dlaf::common::Ordering::ColumnMajor);
 
   GlobalElementSize matrix_size(n, n);
   TileElementSize block_size(nb, nb);
@@ -125,7 +125,7 @@ int miniapp(hpx::program_options::variables_map&) {
             });
         hpx::dataflow(std::move(compute_w_f), v, t, Wh(index_v_component));
 
-        if (col_comm_size > 1) {
+        if (grid_cols > 1) {
           // send row-wise
           auto send_w_rowwise_f =
               unwrapping([index_v_component](const ConstTileType& tile, auto&& comm_wrapper) {
@@ -147,43 +147,48 @@ int miniapp(hpx::program_options::variables_map&) {
     }
 
     // TODO compute W2 partial result
-    MatrixType W2({nb, distribution.localSize().cols()}, V.blockSize());
     MatrixType W2_local({nb, distribution.localSize().cols()}, V.blockSize());
     for (const LocalTileIndex& index_e : iterate_range2d(E.distribution().localNrTiles())) {
       LocalTileIndex index_w(index_e.row(), 0);
       LocalTileIndex index_w2(0, index_e.col());
-      auto compute_w2_f = unwrapping([index_e](auto&& w, auto&& e, auto&& w2) {
+      auto compute_w2_f = unwrapping([index_e](auto&& w, auto&& e, auto&& w2_local) {
         Type result = w({0, 0}) * e({0, 0});
         if (index_e.row() == 0)
-          w2({0, 0}) = result;
+          w2_local({0, 0}) = result;
         else
-          w2({0, 0}) += result;
-        std::cout << "W2 partial " << index_e << " " << w2({0, 0}) << " " << result << "=" << w({0, 0})
+          w2_local({0, 0}) += result;
+        std::cout << "W2 partial " << index_e << " " << w2_local({0, 0}) << " " << result << "=" << w({0, 0})
                   << " " << e({0, 0}) << std::endl;
       });
       hpx::dataflow(std::move(compute_w2_f), Wh.read(index_w), E(index_e), W2_local(index_w2));
     }
 
     // TODO reduce the W2 row tile by tile column-wise
-    for (const LocalTileIndex& index_w2 : iterate_range2d(W2.distribution().localNrTiles())) {
-      using dlaf::common::make_data;
-      auto all_reduce_w2 = unwrapping(
-          [rank, rank_col_reflector, row_comm_size](auto&& w2partial, auto&& w2, auto&& comm_wrapper) {
-            // TODO implement all-reduce (in-place?)
+    MatrixType W2({nb, distribution.localSize().cols()}, V.blockSize());
+    if (grid_rows > 1) {
+      for (const LocalTileIndex& index_w2 : iterate_range2d(W2.distribution().localNrTiles())) {
+        using dlaf::common::make_data;
+        auto all_reduce_w2 =
+          unwrapping([rank, rank_col_reflector](auto&& w2_local, auto&& w2, auto&& comm_wrapper) {
+              // TODO implement all-reduce (in-place?)
 
-            std::cout << "W2 reducing " << w2partial({0, 0}) << std::endl;
-            const IndexT_MPI master_rank = 0;
-            dlaf::comm::sync::reduce(master_rank, comm_wrapper().colCommunicator(), MPI_SUM,
-                                     make_data(w2partial), make_data(w2));
+              std::cout << "W2 reducing " << w2_local({0, 0}) << std::endl;
+              const IndexT_MPI master_rank = 0;
+              dlaf::comm::sync::reduce(master_rank, comm_wrapper().colCommunicator(), MPI_SUM,
+                  make_data(w2_local), make_data(w2));
 
-            std::cout << "W2 all-bcasting " << w2({0, 0}) << std::endl;
-            if (rank.col() == master_rank)
+              std::cout << "W2 all-bcasting " << w2({0, 0}) << std::endl;
+              if (rank.row() == master_rank)
               dlaf::comm::sync::broadcast::send(comm_wrapper().colCommunicator(), make_data(w2));
-            else
+              else
               dlaf::comm::sync::broadcast::receive_from(master_rank, comm_wrapper().colCommunicator(),
-                                                        make_data(w2));
-          });
-      hpx::dataflow(std::move(all_reduce_w2), W2_local.read(index_w2), W2(index_w2), serial_comm());
+                  make_data(w2));
+              });
+        hpx::dataflow(std::move(all_reduce_w2), W2_local.read(index_w2), W2(index_w2), serial_comm());
+      }
+    }
+    else { // just use local as the W2, no need to reduce
+      W2 = std::move(W2_local);
     }
 
     // TODO broadcast the component of the current V row-wise
@@ -197,7 +202,7 @@ int miniapp(hpx::program_options::variables_map&) {
         reflector_v[index_v_component.row()] =
             V.read(LocalTileIndex{index_v_component.row(), local_k_reflector});
 
-        if (col_comm_size > 1) {
+        if (grid_cols > 1) {
           auto send_v_rowwise_f = unwrapping([](const ConstTileType& tile, auto&& comm_wrapper) {
             std::cout << "send v " << tile({0, 0}) << std::endl;
             dlaf::comm::sync::broadcast::send(comm_wrapper().rowCommunicator(), tile);
@@ -214,8 +219,9 @@ int miniapp(hpx::program_options::variables_map&) {
 
         auto recv_v_rowwise_f =
             unwrapping([rank = rank_col_reflector](auto&& tile, auto&& comm_wrapper) {
-              std::cout << "receive v" << std::endl;
+              std::cout << "receive v " << std::endl;
               dlaf::comm::sync::broadcast::receive_from(rank, comm_wrapper().rowCommunicator(), tile);
+              std::cout << "received v " << tile({0, 0}) << std::endl;
               return ConstTileType(std::move(tile));
             });
         reflector_v[index_v_component.row()] =
@@ -249,16 +255,27 @@ int main(int argc, char** argv) {
   using namespace hpx::program_options;
   options_description desc_commandline("Usage: " HPX_APPLICATION_STRING " [options]");
 
+  // clang-format off
+  desc_commandline.add_options()
+    ("grid-rows", value<int>()->default_value(1), "Number of row processes in the 2D communicator")
+    ("grid-cols", value<int>()->default_value(1), "Number of column processes in the 2D communicator");
+  // clang-format on
+
   auto ret_code = hpx::init(miniapp, desc_commandline, argc, argv);
 
   return ret_code;
 }
 
 void print(MatrixType& matrix) {
-  std::cout << matrix << std::endl;
   using dlaf::common::iterate_range2d;
-  for (const auto& index : iterate_range2d(matrix.distribution().localNrTiles())) {
-    std::cout << index << '\t' << matrix.read(index).get()({0, 0}) << std::endl;
+
+  const auto& distribution = matrix.distribution();
+
+  std::cout << matrix << std::endl;
+
+  for (const auto& index : iterate_range2d(distribution.localNrTiles())) {
+    const auto index_global = distribution.globalTileIndex(index);
+    std::cout << index_global << '\t' << matrix.read(index).get()({0, 0}) << std::endl;
   }
   std::cout << "finished" << std::endl;
 }
