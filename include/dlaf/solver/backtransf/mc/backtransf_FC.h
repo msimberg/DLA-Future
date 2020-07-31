@@ -57,15 +57,16 @@ void backtransf_FC(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Devic
   SizeType mb = mat_t.blockSize().rows();
   SizeType nb = mat_t.blockSize().cols();
 
-  // Create a temporary matrix to store W2 (full of zeros)
-  TileElementSize size(mb, nb);
-  auto dist = mat_t.distribution();
-  auto layout = tileLayout(dist.localSize(), size);
-  Matrix<T, Device::CPU> mat_w2(std::move(dist), layout);
-
   // n-1 reflectors
   for (SizeType i = 0; i < (n - 1); ++i) {
-    for (SizeType k = 0; k < m; ++k) {
+
+    // Create a temporary matrix to store W2 (full of zeros)
+    TileElementSize size(mb, nb);
+    auto dist = mat_t.distribution();
+    auto layout = tileLayout(dist.localSize(), size);
+    Matrix<T, Device::CPU> mat_w2(std::move(dist), layout);
+
+    for (SizeType k = i; k < m; ++k) {
       auto ki = LocalTileIndex{k, i};
       auto kk = LocalTileIndex{k, k};
       // W = V T (W --> T)
@@ -73,9 +74,9 @@ void backtransf_FC(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Devic
                     NonUnit, alpha, mat_v.read(ki), std::move(mat_t(ki)));
     }
 
-    for (SizeType k = 0; k < m; ++k) {
+    for (SizeType k = i; k < m; ++k) {
       auto ki = LocalTileIndex{k, i};
-      for (SizeType j = 0; j < n; ++j) {
+      for (SizeType j = i; j < n; ++j) {
         auto ji = LocalTileIndex{j, i};
         auto jk = LocalTileIndex{j, k};
         // W2 = WH C
