@@ -19,6 +19,13 @@ namespace dlaf {
 
 template <>
 struct Solver<Backend::MC> {
+  /// Eigenvalue back-transformation
+  ///
+  /// TODO: FIX THIS DESCRIPTION
+  template <class T>
+  static void backtransf(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& mat_v,
+                         Matrix<T, Device::CPU>& mat_t);
+
   /// Triangular Solve implementation on local memory, solving op(A) X = alpha B (when side == Left)
   /// or X op(A) = alpha B (when side == Right).
   ///
@@ -67,6 +74,7 @@ struct Solver<Backend::MC> {
 
 }
 
+#include <dlaf/solver/backtransf/mc.tpp>
 #include <dlaf/solver/triangular/mc.tpp>
 
 /// ---- ETI
@@ -87,5 +95,16 @@ DLAF_TRIANGULAR_ETI(extern, float)
 DLAF_TRIANGULAR_ETI(extern, double)
 DLAF_TRIANGULAR_ETI(extern, std::complex<float>)
 DLAF_TRIANGULAR_ETI(extern, std::complex<double>)
+
+#define DLAF_BACKTRANSF_ETI(KWORD, DATATYPE)                                                          \
+  KWORD template void Solver<Backend::MC>::backtransf<DATATYPE>(DATATYPE,                             \
+                                                                Matrix<DATATYPE, Device::CPU>&,       \
+                                                                Matrix<const DATATYPE, Device::CPU>&, \
+                                                                Matrix<DATATYPE, Device::CPU>&);
+
+DLAF_BACKTRANSF_ETI(extern, float)
+DLAF_BACKTRANSF_ETI(extern, double)
+DLAF_BACKTRANSF_ETI(extern, std::complex<float>)
+DLAF_BACKTRANSF_ETI(extern, std::complex<double>)
 
 }

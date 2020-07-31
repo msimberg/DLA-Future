@@ -63,6 +63,21 @@ void herk(blas::Uplo uplo, blas::Op op, BaseType<T> alpha, const Tile<const T, d
 }
 
 template <class T, Device device>
+void trmm(blas::Side side, blas::Uplo uplo, blas::Op op, blas::Diag diag, T alpha,
+          const Tile<const T, device>& a, const Tile<T, device>& b) noexcept {
+  SizeType m = b.size().rows();
+  SizeType n = b.size().cols();
+
+  DLAF_ASSERT(a.size().rows() == a.size().cols(), "`a` is not square!", a);
+
+  auto left_side = (side == blas::Side::Left ? m : n);
+  DLAF_ASSERT(a.size().rows() == left_side, "`a` has an invalid size!", a, left_side);
+
+  blas::trmm(blas::Layout::ColMajor, side, uplo, op, diag, m, n, alpha, a.ptr(), a.ld(), b.ptr(),
+             b.ld());
+}
+
+template <class T, Device device>
 void trsm(blas::Side side, blas::Uplo uplo, blas::Op op, blas::Diag diag, T alpha,
           const Tile<const T, device>& a, const Tile<T, device>& b) noexcept {
   SizeType m = b.size().rows();
