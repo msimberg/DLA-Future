@@ -27,22 +27,9 @@ using namespace dlaf::matrix::test;
 using namespace dlaf_test;
 using namespace testing;
 
-//::testing::Environment* const comm_grids_env =
-//    ::testing::AddGlobalTestEnvironment(new CommunicatorGrid6RanksEnvironment);
-
 template <typename Type>
 class BacktransfSolverLocalTest : public ::testing::Test {};
 TYPED_TEST_SUITE(BacktransfSolverLocalTest, MatrixElementTypes);
-
-// template <typename Type>
-// class BacktransfSolverDistributedTest : public ::testing::Test {
-// public:
-//  const std::vector<CommunicatorGrid>& commGrids() {
-//    return comm_grids;
-//  }
-//};
-//
-// TYPED_TEST_SUITE(BacktransfSolverDistributedTest, MatrixElementTypes);
 
 const std::vector<blas::Side> blas_sides({blas::Side::Left, blas::Side::Right});
 const std::vector<blas::Uplo> blas_uplos({blas::Uplo::Lower, blas::Uplo::Upper});
@@ -61,12 +48,12 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
   return {size.rows(), size.cols()};
 }
 
-TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
+TYPED_TEST(BacktransfSolverLocalTest, Correctness3x3) {
   const SizeType n = 3;
   const SizeType nb = 1;
 
   // DATA
-  auto el_E = [](const GlobalElementIndex& index) {
+  auto el_C = [](const GlobalElementIndex& index) {
     // ColMajor
     static const double values[] = {12, 6, -4, -51, 167, 24, 4, -68, -41};
     return values[index.row() + 3 * index.col()];
@@ -91,10 +78,10 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
     return values[index.row() + 3 * index.col()];
   };
 
-  LocalElementSize sizeE(n, n);
-  TileElementSize blockSizeE(nb, nb);
-  Matrix<double, Device::CPU> mat_e(sizeE, blockSizeE);
-  set(mat_e, el_E);
+  LocalElementSize sizeC(n, n);
+  TileElementSize blockSizeC(nb, nb);
+  Matrix<double, Device::CPU> mat_c(sizeC, blockSizeC);
+  set(mat_c, el_C);
 
   LocalElementSize sizeV(n, n);
   TileElementSize blockSizeV(nb, nb);
@@ -106,8 +93,121 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
   Matrix<double, Device::CPU> mat_t(sizeT, blockSizeT);
   set(mat_t, el_T);
 
-  std::cout << "Matrix E" << std::endl;
-  printElements(mat_e);
+  //  std::cout << "Matrix C" << std::endl;
+  //  printElements(mat_c);
+  //  std::cout << "" << std::endl;
+  //  std::cout << "Matrix V" << std::endl;
+  //  printElements(mat_v);
+  //  std::cout << "" << std::endl;
+  //  std::cout << "Matrix T" << std::endl;
+  //  printElements(mat_t);
+  //  std::cout << "" << std::endl;
+
+  Solver<Backend::MC>::backtransf(mat_c, mat_v, mat_t);
+
+  //  std::cout << "Result: " << std::endl;
+  //  printElements(mat_c);
+
+  CHECK_MATRIX_NEAR(res, mat_c, 1e13 * (mat_c.size().rows() + 1) * TypeUtilities<double>::error,
+                    1e13 * (mat_c.size().rows() + 1) * TypeUtilities<double>::error);
+}
+
+TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
+  // To be generalized
+  const SizeType n = 3;
+  const SizeType nb = 1;
+
+  BaseType<TypeParam> beta = 1.0f;
+  BaseType<TypeParam> gamma = 1.0f;
+  BaseType<TypeParam> delta = 1.0f;
+
+  // MODIFY
+  // Note: The tile elements are chosen such that:
+  // - res_ij = 1 / 2^(|i-j|) * exp(I*(-i+j)),
+  // where I = 0 for real types or I is the complex unit for complex types.
+  // Therefore the result should be:
+  // a_ij = Sum_k(res_ik * ConjTrans(res)_kj) =
+  //      = Sum_k(1 / 2^(|i-k| + |j-k|) * exp(I*(-i+j))),
+  // where k = 0 .. min(i,j)
+  // Therefore,
+  // a_ij = (4^(min(i,j)+1) - 1) / (3 * 2^(i+j)) * exp(I*(-i+j))
+
+  // Matric C
+  auto el_c = [beta, gamma](const GlobalElementIndex& index) {
+    SizeType k = index.row();
+    SizeType j = index.col();
+
+    return TypeUtilities<TypeParam>::polar(gamma / (std::exp2(k + j)), beta * (k + j));
+  };
+
+  // Matrix V
+  auto el_v = [beta, delta](const GlobalElementIndex& index) {
+    SizeType k = index.row();
+    SizeType i = index.col();
+
+    //    if (k == i)
+    //      return TypeUtilities<TypeParam>::polar(1.0, 0.0);
+    //
+    //    if (k < i)
+    //      return TypeUtilities<TypeParam>::polar(-9.9, 0.0);
+
+    return TypeUtilities<TypeParam>::polar(delta / (std::exp2(k - i)), beta * (k - i));
+  };
+
+  // Matrix T
+  auto el_t = [beta, gamma](const GlobalElementIndex& index) {
+    SizeType l = index.row();
+    SizeType i = index.col();
+    // SizeType l = 0.0;
+
+    TypeParam el =
+        TypeUtilities<TypeParam>::polar(gamma / (std::exp2(2 * i - 2 * l)), beta * (2 * i - 2 * l));
+
+    return el;
+  };
+
+  // Matrix Result
+  auto res = [beta, gamma, delta, el_c, n](const GlobalElementIndex& index) {
+    SizeType k = index.row();
+    SizeType j = index.col();
+
+    BaseType<TypeParam> sub = 1.0;
+    SizeType max;
+
+    if (k == j) {
+      max = k + 1;
+      if (k == (n - 1))
+        max = k;
+    }
+    else {
+      if (k < j)
+        max = k + 1;
+      else
+        max = j + 1;
+    }
+
+    for (SizeType i = 0; i < max; i++)
+      sub = sub * (1.0 - (n - i) * delta * gamma * gamma);
+
+    TypeParam el = TypeUtilities<TypeParam>::polar((gamma * sub) / (std::exp2(k + j)), (beta * (k + j)));
+
+    return el;
+  };
+
+  LocalElementSize size_mat(n, n);
+  TileElementSize blockSize_mat(nb, nb);
+  Matrix<TypeParam, Device::CPU> mat_v(size_mat, blockSize_mat);
+  Matrix<TypeParam, Device::CPU> mat_t(size_mat, blockSize_mat);
+  Matrix<TypeParam, Device::CPU> mat_c(size_mat, blockSize_mat);
+  Matrix<TypeParam, Device::CPU> mat_res(size_mat, blockSize_mat);
+
+  set(mat_v, el_v);
+  set(mat_t, el_t);
+  set(mat_c, el_c);
+  set(mat_res, res);
+
+  std::cout << "Matrix C" << std::endl;
+  printElements(mat_c);
   std::cout << "" << std::endl;
   std::cout << "Matrix V" << std::endl;
   printElements(mat_v);
@@ -116,12 +216,12 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
   printElements(mat_t);
   std::cout << "" << std::endl;
 
-  double alpha = TypeUtilities<double>::element(1.0, 0.0);
-  Solver<Backend::MC>::backtransf(alpha, mat_e, mat_v, mat_t);
+  Solver<Backend::MC>::backtransf(mat_c, mat_v, mat_t);
 
-  std::cout << "Result: " << std::endl;
-  printElements(mat_e);
+  std::cout << "RESULT: matrix C" << std::endl;
+  printElements(mat_c);
+  std::cout << "" << std::endl;
 
-  CHECK_MATRIX_NEAR(res, mat_e, 1e13 * (mat_e.size().rows() + 1) * TypeUtilities<double>::error,
-                    1e13 * (mat_e.size().rows() + 1) * TypeUtilities<double>::error);
+  CHECK_MATRIX_NEAR(res, mat_c, 20 * (mat_c.size().rows() + 1) * TypeUtilities<double>::error,
+                    20 * (mat_c.size().rows() + 1) * TypeUtilities<double>::error);
 }

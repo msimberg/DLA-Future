@@ -32,8 +32,16 @@ namespace internal {
 namespace mc {
 
 // Local implementation of Left Lower NoTrans
+
+// Implementation based on:
+// 1. Algorithm 6 "LAPACK Algorithm for the eigenvector back-transformation", page 15, PhD thesis "GPU
+// Accelerated Implementations of a Generalized Eigenvalue Solver for Hermitian Matrices with Systematic
+// Energy and Time to Solution Analysis" presented by Raffaele Solcà (2016)
+// 2. Report "Gep + back-transformation", Alberto Invernizzi (2020)
+// 3. Report "Reduction to band + back-transformation", Raffaele Solcà (2020)
+
 template <class T>
-void backtransf_FC(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& mat_v,
+void backtransf_FC(Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& mat_v,
                    Matrix<T, Device::CPU>& mat_t) {
   constexpr auto Left = blas::Side::Left;
   constexpr auto Right = blas::Side::Right;
@@ -59,7 +67,6 @@ void backtransf_FC(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Devic
 
   // n-1 reflectors
   for (SizeType i = 0; i < (n - 1); ++i) {
-
     // Create a temporary matrix to store W2 (full of zeros)
     TileElementSize size(mb, nb);
     auto dist = mat_t.distribution();
@@ -71,7 +78,7 @@ void backtransf_FC(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Devic
       auto kk = LocalTileIndex{k, k};
       // W = V T (W --> T)
       hpx::dataflow(executor_hp, hpx::util::unwrapping(tile::trmm<T, Device::CPU>), Left, Upper, NoTrans,
-                    NonUnit, alpha, mat_v.read(ki), std::move(mat_t(ki)));
+                    NonUnit, 1.0, mat_v.read(ki), std::move(mat_t(ki)));
     }
 
     for (SizeType k = i; k < m; ++k) {

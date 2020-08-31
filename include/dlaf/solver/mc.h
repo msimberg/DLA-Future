@@ -23,7 +23,7 @@ struct Solver<Backend::MC> {
   ///
   /// TODO: FIX THIS DESCRIPTION
   template <class T>
-  static void backtransf(T alpha, Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& mat_v,
+  static void backtransf(Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& mat_v,
                          Matrix<T, Device::CPU>& mat_t);
 
   /// Triangular Solve implementation on local memory, solving op(A) X = alpha B (when side == Left)
@@ -97,8 +97,7 @@ DLAF_TRIANGULAR_ETI(extern, std::complex<float>)
 DLAF_TRIANGULAR_ETI(extern, std::complex<double>)
 
 #define DLAF_BACKTRANSF_ETI(KWORD, DATATYPE)                                                          \
-  KWORD template void Solver<Backend::MC>::backtransf<DATATYPE>(DATATYPE,                             \
-                                                                Matrix<DATATYPE, Device::CPU>&,       \
+  KWORD template void Solver<Backend::MC>::backtransf<DATATYPE>(Matrix<DATATYPE, Device::CPU>&,       \
                                                                 Matrix<const DATATYPE, Device::CPU>&, \
                                                                 Matrix<DATATYPE, Device::CPU>&);
 

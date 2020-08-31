@@ -17,7 +17,7 @@
 namespace dlaf {
 
 template <class T>
-void Solver<Backend::MC>::backtransf(T alpha, Matrix<T, Device::CPU>& mat_c,
+void Solver<Backend::MC>::backtransf(Matrix<T, Device::CPU>& mat_c,
                                      Matrix<const T, Device::CPU>& mat_v,
                                      Matrix<T, Device::CPU>& mat_t) {
   // TODO add preconditions
@@ -29,7 +29,7 @@ void Solver<Backend::MC>::backtransf(T alpha, Matrix<T, Device::CPU>& mat_c,
   DLAF_ASSERT(matrix::square_size(mat_t), mat_t);
   DLAF_ASSERT(matrix::local_matrix(mat_t), mat_t);
 
-  internal::mc::backtransf_FC(alpha, mat_c, mat_v, mat_t);
+  internal::mc::backtransf_FC(mat_c, mat_v, mat_t);
 }
 
 }
