@@ -18,7 +18,7 @@ namespace dlaf_test {
 using ElementTypes =
     ::testing::Types<int, long long, float, double, std::complex<float>, std::complex<double>>;
 //using MatrixElementTypes = ::testing::Types<float, double, std::complex<float>, std::complex<double>>;
- using MatrixElementTypes = ::testing::Types<float>;
+ using MatrixElementTypes = ::testing::Types<std::complex<float>>;
 
 template <class T>
 struct TypeUtilities {

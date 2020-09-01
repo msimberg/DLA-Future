@@ -88,7 +88,7 @@ void backtransf_FC(Matrix<T, Device::CPU>& mat_c, Matrix<const T, Device::CPU>& 
         auto jk = LocalTileIndex{j, k};
         // W2 = WH C
         hpx::dataflow(executor_normal, hpx::util::unwrapping(tile::gemm<T, Device::CPU>), ConjTrans,
-                      NoTrans, 1.0, std::move(mat_t(ji)), mat_c.read(jk), 1.0, std::move(mat_w2(ki)));
+                      ConjTrans, 1.0, std::move(mat_t(ji)), mat_c.read(jk), 1.0, std::move(mat_w2(ki)));
       }
     }
 
