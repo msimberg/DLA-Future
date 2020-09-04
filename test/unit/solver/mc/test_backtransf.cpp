@@ -20,6 +20,12 @@
 #include "dlaf_test/matrix/util_matrix_blas.h"
 #include "dlaf_test/util_types.h"
 
+//// TRAPPING
+//#pragma STDC FENV_ACCESS ON
+//#include<cfenv>
+//#include<fenv.h>
+//#include<signal.h>
+
 using namespace dlaf;
 using namespace dlaf::comm;
 using namespace dlaf::matrix;
@@ -47,6 +53,19 @@ const std::vector<std::tuple<SizeType, SizeType, SizeType, SizeType>> sizes = {
 GlobalElementSize globalTestSize(const LocalElementSize& size) {
   return {size.rows(), size.cols()};
 }
+
+//// TRAPPING
+//void floating_point_handler(int signal, siginfo_t *sip, void *uap) {
+//  std::cerr << "floating point error at " << sip->si_addr << " : ";
+//  int code=sip->si_code;
+//  if (code==FPE_FLTDIV)
+//    std::cerr << "division by zero\n";
+//  if (code==FPE_FLTUND)
+//    std::cerr << "underflow\n";
+//  if (code==FPE_FLTINV)
+//    std::cerr << "invalid result\n";
+//  std::abort();
+//}
 
 //TYPED_TEST(BacktransfSolverLocalTest, Correctness3x3) {
 //  const SizeType n = 3;
@@ -113,8 +132,21 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
 //}
 
 TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
+//  //TRAPPING
+//   std::feclearexcept(FE_ALL_EXCEPT);
+//  feenableexcept(FE_DIVBYZERO | FE_UNDERFLOW | FE_OVERFLOW | FE_INVALID);
+//  struct sigaction act;
+//  act.sa_sigaction=floating_point_handler;
+//  act.sa_flags=SA_SIGINFO;
+//  sigaction(SIGFPE, &act, NULL);
+
+//  double zero=0.0; 
+//  double one=1.0;
+//  std::cout << "1.0/1.0 = " << one/one << '\n';
+//  std::cout << "1.0/0.0 = " << one/zero << '\n';
+  
   // To be generalized
-  const SizeType n = 4;
+  const SizeType n = 3;
   const SizeType nb = 1;
 
   BaseType<TypeParam> beta = 1.0f;
@@ -206,21 +238,21 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
   set(mat_c, el_c);
   set(mat_res, res);
 
-  std::cout << "Matrix C" << std::endl;
-  printElements(mat_c);
-  std::cout << "" << std::endl;
-  std::cout << "Matrix V" << std::endl;
-  printElements(mat_v);
-  std::cout << "" << std::endl;
-  std::cout << "Matrix T" << std::endl;
-  printElements(mat_t);
-  std::cout << "" << std::endl;
+//  std::cout << "Matrix C" << std::endl;
+//  printElements(mat_c);
+//  std::cout << "" << std::endl;
+//  std::cout << "Matrix V" << std::endl;
+//  printElements(mat_v);
+//  std::cout << "" << std::endl;
+//  std::cout << "Matrix T" << std::endl;
+//  printElements(mat_t);
+//  std::cout << "" << std::endl;
 
   Solver<Backend::MC>::backtransf(mat_c, mat_v, mat_t);
 
-  std::cout << "RESULT: matrix C" << std::endl;
-  printElements(mat_c);
-  std::cout << "" << std::endl;
+//  std::cout << "RESULT: matrix C" << std::endl;
+//  printElements(mat_c);
+//  std::cout << "" << std::endl;
 
   CHECK_MATRIX_NEAR(res, mat_c, 40 * (mat_c.size().rows() + 1) * TypeUtilities<TypeParam>::error,
                     40 * (mat_c.size().rows() + 1) * TypeUtilities<TypeParam>::error);

@@ -19,4 +19,4 @@ DLAF_addTest(test_backtransf
   SOURCES test_backtransf.cpp
   LIBRARIES dlaf.solver dlaf.core
   USE_MAIN HPX
-)
+  )
