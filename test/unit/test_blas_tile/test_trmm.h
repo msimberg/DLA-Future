@@ -50,18 +50,16 @@ void testTrmm(blas::Side side, blas::Uplo uplo, blas::Op op, blas::Diag diag, Si
   Tile<T, Device::CPU> a0(size_a, std::move(mem_a), lda);
   Tile<T, Device::CPU> b(size_b, std::move(mem_b), ldb);
 
-  T alpha = TypeUtilities<T>::element(1.0, 0.0);
-  // T alpha = TypeUtilities<T>::element(-1.2, .7);
-  // T alphainv = TypeUtilities<T>::element(-1.0/1.2, -.7);
+  T alpha = TypeUtilities<T>::element(-1.2, .7);
 
   std::function<T(const TileElementIndex&)> el_op_a, el_b, res_b;
 
   if (side == blas::Side::Left)
     std::tie(el_op_a, el_b, res_b) =
-        test::getLeftTriangularSystem<ElementIndex, T>(uplo, op, diag, alpha, m);
+        test::getLeftTriangularMMSystem<ElementIndex, T>(uplo, op, diag, alpha, m);
   else
     std::tie(el_op_a, el_b, res_b) =
-        test::getRightTriangularSystem<ElementIndex, T>(uplo, op, diag, alpha, n);
+        test::getRightTriangularMMSystem<ElementIndex, T>(uplo, op, diag, alpha, n);
 
   set(a0, el_op_a, op);
   set(b, el_b);

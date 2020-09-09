@@ -55,7 +55,7 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
 }
 
 //// TRAPPING
-//void floating_point_handler(int signal, siginfo_t *sip, void *uap) {
+// void floating_point_handler(int signal, siginfo_t *sip, void *uap) {
 //  std::cerr << "floating point error at " << sip->si_addr << " : ";
 //  int code=sip->si_code;
 //  if (code==FPE_FLTDIV)
@@ -67,7 +67,7 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
 //  std::abort();
 //}
 
-//TYPED_TEST(BacktransfSolverLocalTest, Correctness3x3) {
+// TYPED_TEST(BacktransfSolverLocalTest, Correctness3x3) {
 //  const SizeType n = 3;
 //  const SizeType nb = 1;
 //
@@ -86,7 +86,7 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
 //
 //  auto el_T = [](const GlobalElementIndex& index) {
 //    // ColMajor
-//    static const double values[] = {1.8571, 1.8571, 1.8571, 1.9938, 1.9938, 1.9938, 0, 0, 0};
+//    static const double values[] = {1.8571, 1.8571, 1.8571, 0.0, 1.9938, 1.9938, 0, 0, 0};
 //    return values[index.row() + 3 * index.col()];
 //  };
 //
@@ -132,21 +132,21 @@ GlobalElementSize globalTestSize(const LocalElementSize& size) {
 //}
 
 TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
-//  //TRAPPING
-//   std::feclearexcept(FE_ALL_EXCEPT);
-//  feenableexcept(FE_DIVBYZERO | FE_UNDERFLOW | FE_OVERFLOW | FE_INVALID);
-//  struct sigaction act;
-//  act.sa_sigaction=floating_point_handler;
-//  act.sa_flags=SA_SIGINFO;
-//  sigaction(SIGFPE, &act, NULL);
+  //  //TRAPPING
+  //   std::feclearexcept(FE_ALL_EXCEPT);
+  //  feenableexcept(FE_DIVBYZERO | FE_UNDERFLOW | FE_OVERFLOW | FE_INVALID);
+  //  struct sigaction act;
+  //  act.sa_sigaction=floating_point_handler;
+  //  act.sa_flags=SA_SIGINFO;
+  //  sigaction(SIGFPE, &act, NULL);
 
-//  double zero=0.0; 
-//  double one=1.0;
-//  std::cout << "1.0/1.0 = " << one/one << '\n';
-//  std::cout << "1.0/0.0 = " << one/zero << '\n';
-  
+  //  double zero=0.0;
+  //  double one=1.0;
+  //  std::cout << "1.0/1.0 = " << one/one << '\n';
+  //  std::cout << "1.0/0.0 = " << one/zero << '\n';
+
   // To be generalized
-  const SizeType n = 3;
+  const SizeType n = 4;
   const SizeType nb = 1;
 
   BaseType<TypeParam> beta = 1.0f;
@@ -177,11 +177,11 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
     SizeType k = index.row();
     SizeType i = index.col();
 
-    //    if (k == i)
-    //      return TypeUtilities<TypeParam>::polar(1.0, 0.0);
-    //
-    //    if (k < i)
-    //      return TypeUtilities<TypeParam>::polar(-9.9, 0.0);
+    if (k == i)
+      return TypeUtilities<TypeParam>::polar(1.0, 0.0);
+
+    if (k < i)
+      return TypeUtilities<TypeParam>::polar(-9.9, 0.0);
 
     return TypeUtilities<TypeParam>::polar(delta / (std::exp2(k - i)), beta * (k - i));
   };
@@ -238,21 +238,21 @@ TYPED_TEST(BacktransfSolverLocalTest, Correctness) {
   set(mat_c, el_c);
   set(mat_res, res);
 
-//  std::cout << "Matrix C" << std::endl;
-//  printElements(mat_c);
-//  std::cout << "" << std::endl;
-//  std::cout << "Matrix V" << std::endl;
-//  printElements(mat_v);
-//  std::cout << "" << std::endl;
-//  std::cout << "Matrix T" << std::endl;
-//  printElements(mat_t);
-//  std::cout << "" << std::endl;
+  std::cout << "Matrix C" << std::endl;
+  printElements(mat_c);
+  std::cout << "" << std::endl;
+  std::cout << "Matrix V" << std::endl;
+  printElements(mat_v);
+  std::cout << "" << std::endl;
+  std::cout << "Matrix T" << std::endl;
+  printElements(mat_t);
+  std::cout << "" << std::endl;
 
   Solver<Backend::MC>::backtransf(mat_c, mat_v, mat_t);
 
-//  std::cout << "RESULT: matrix C" << std::endl;
-//  printElements(mat_c);
-//  std::cout << "" << std::endl;
+  std::cout << "RESULT: matrix C" << std::endl;
+  printElements(mat_c);
+  std::cout << "" << std::endl;
 
   CHECK_MATRIX_NEAR(res, mat_c, 40 * (mat_c.size().rows() + 1) * TypeUtilities<TypeParam>::error,
                     40 * (mat_c.size().rows() + 1) * TypeUtilities<TypeParam>::error);
