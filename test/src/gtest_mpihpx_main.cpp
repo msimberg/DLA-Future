@@ -44,9 +44,11 @@
 
 #include "gtest_mpi_listener.h"
 
-GTEST_API_ int test_main(int, char**) {
+GTEST_API_ int test_main(int argc, char** argv) {
   std::printf("Running main() from gtest_mpihpx_main.cpp\n");
+  dlaf::initialize(argc, argv);
   auto ret = RUN_ALL_TESTS();
+  dlaf::finalize();
   hpx::finalize();
   return ret;
 }

@@ -46,6 +46,16 @@ struct CopyTile<T, Device::CPU, Device::GPU> {
     DLAF_CUDA_CALL(cudaMemcpy2D(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
                                 source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault));
   }
+
+  static void call(const matrix::Tile<const T, Device::CPU>& source,
+                   const matrix::Tile<T, Device::GPU>& destination, cudaStream_t stream) {
+    SizeType m = source.size().rows();
+    SizeType n = source.size().cols();
+
+    DLAF_CUDA_CALL(cudaMemcpy2DAsync(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
+                                     source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault,
+                                     stream));
+  }
 };
 
 template <typename T>
@@ -57,6 +67,16 @@ struct CopyTile<T, Device::GPU, Device::CPU> {
 
     DLAF_CUDA_CALL(cudaMemcpy2D(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
                                 source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault));
+  }
+
+  static void call(const matrix::Tile<const T, Device::GPU>& source,
+                   const matrix::Tile<T, Device::CPU>& destination, cudaStream_t stream) {
+    SizeType m = source.size().rows();
+    SizeType n = source.size().cols();
+
+    DLAF_CUDA_CALL(cudaMemcpy2DAsync(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
+                                     source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault,
+                                     stream));
   }
 };
 
@@ -70,17 +90,35 @@ struct CopyTile<T, Device::GPU, Device::GPU> {
     DLAF_CUDA_CALL(cudaMemcpy2D(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
                                 source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault));
   }
+
+  static void call(const matrix::Tile<const T, Device::GPU>& source,
+                   const matrix::Tile<T, Device::GPU>& destination, cudaStream_t stream) {
+    SizeType m = source.size().rows();
+    SizeType n = source.size().cols();
+
+    DLAF_CUDA_CALL(cudaMemcpy2DAsync(destination.ptr(), destination.ld() * sizeof(T), source.ptr(),
+                                     source.ld() * sizeof(T), m * sizeof(T), n, cudaMemcpyDefault,
+                                     stream));
+  }
 };
 #endif
 }
 
-template <typename T, Device Source, Device Destination>
-void copy(const Tile<const T, Source>& source, const Tile<T, Destination>& destination) {
+#define DLAF_MAKE_FUNCTION_OBJECT(fname) \
+  struct fname##_t {                             \
+    template <typename... Ts>                    \
+    decltype(auto) operator(Ts&&... ts) {        \
+      return fname(std::forward<Ts>(ts)...);     \
+    }                                            \
+  }
+
+template <typename T, Device Source, Device Destination, typename... Ts>
+void copy(const Tile<const T, Source>& source, const Tile<T, Destination>& destination, Ts&&... ts) {
   DLAF_ASSERT_HEAVY(source.size().rows() == destination.size().rows(),
                     "number of rows in source and destination tiles must be equal for tile copy");
   DLAF_ASSERT_HEAVY(source.size().cols() == destination.size().cols(),
                     "number of columns in source and destination tiles must be equal for tile copy");
-  internal::CopyTile<T, Source, Destination>::call(source, destination);
+  internal::CopyTile<T, Source, Destination>::call(source, destination, std::forward<Ts>(ts)...);
 }
 
 template <class T>
@@ -88,6 +126,34 @@ void copy(TileElementSize region, TileElementIndex in_idx, const matrix::Tile<co
           TileElementIndex out_idx, const matrix::Tile<T, Device::CPU>& out) {
   dlaf::tile::lacpy<T>(region, in_idx, in, out_idx, out);
 }
+
+DLAF_MAKE_FUNCTION_OBJECT(copy);
+
+template <typename T>
+decltype(auto) unwrap_future(T&& t) {
+  return std::forward<T>(t);
+}
+
+template <typename Tile>
+decltype(auto) unwrap_future<hpx::future<Tile>>(hpx::future<Tile>&& t) {
+  return t.get();
+}
+
+template <typename F>
+struct unwrap_extend_tiles {
+  F f;
+
+  template <typename... Ts>
+  decltype(auto) operator()(Ts&&... ts) {
+    // This unwraps futures only.
+    std::tuple<> t{unwrap_future<Ts>(ts)...};
+    // Here we want everything unwrapped, so we use unwrapping.
+    hpx::invoke_fused(hpx::util::unwrapping(f), t);
+    // Here we want shared_futures preserved, futures unwrapped, rest as they
+    // are.
+    return t;
+  }
+};
 
 }
 }

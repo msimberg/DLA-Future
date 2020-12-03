@@ -35,13 +35,11 @@ void copy(Matrix<const T, Source>& source, Matrix<T, Destination>& dest) {
   const SizeType local_tile_rows = distribution.localNrTiles().rows();
   const SizeType local_tile_cols = distribution.localNrTiles().cols();
 
-  // This prevents a compiler error in `hpx::util::unwrapping()` which is unable to deduce the correct
-  // overload for tile `copy()`.
-  void (&cpy)(const matrix::Tile<const T, Source>&, const matrix::Tile<T, Destination>&) = copy<T>;
+  auto exec = internal::getCopyExecutor<Source, Destination>();
 
   for (SizeType j = 0; j < local_tile_cols; ++j)
     for (SizeType i = 0; i < local_tile_rows; ++i)
-      hpx::dataflow(hpx::util::unwrapping(cpy), source.read(LocalTileIndex(i, j)),
+      hpx::dataflow(exec, unwrap_extend_tiles{copy_f{}}, source.read(LocalTileIndex(i, j)),
                     dest(LocalTileIndex(i, j)));
 }
 }
