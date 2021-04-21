@@ -11,7 +11,13 @@
 
 #include "blas.hh"
 
+#include <functional>
+
+#include <hpx/execution_base/sender.hpp>
+#include <hpx/synchronization/async_rw_mutex.hpp>
+
 #include "dlaf/common/callable_object.h"
+#include "dlaf/init.h"
 #include "dlaf/matrix/tile.h"
 #include "dlaf/types.h"
 #include "dlaf/util_blas.h"
@@ -38,6 +44,29 @@ void gemm(const blas::Op op_a, const blas::Op op_b, const T alpha, const Tile<co
   blas::gemm(blas::Layout::ColMajor, op_a, op_b, s.m, s.n, s.k, alpha, a.ptr(), a.ld(), b.ptr(), b.ld(),
              beta, c.ptr(), c.ld());
 }
+
+// Potential overload for using async_rw_mutex.
+// NOTE: No implicit conversions to templated function parameters, hence the
+// explicit async_rw_mutex_access_wrappers. Add another unwrapping variant for
+// unwrapping those?
+// template <class T>
+// void gemm(const blas::Op op_a, const blas::Op op_b, const T alpha,
+//           hpx::experimental::detail::async_rw_mutex_access_wrapper<
+//               Tile<T, Device::CPU>, const Tile<const T, Device::CPU>,
+//               hpx::experimental::detail::async_rw_mutex_access_type::read>,
+//           hpx::experimental::detail::async_rw_mutex_access_wrapper<
+//               Tile<T, Device::CPU>, const dlaf::matrix::Tile<const T, Device::CPU>,
+//               hpx::experimental::detail::async_rw_mutex_access_type::read>,
+//           const T beta,
+//           hpx::experimental::detail::async_rw_mutex_access_wrapper<
+//               Tile<T, Device::CPU>, const Tile<const T, Device::CPU>,
+//               hpx::experimental::detail::async_rw_mutex_access_type::readwrite>
+//               c) noexcept {
+//   // TODO: Should async_rw_mutex_access_wrapper have a get method?
+//   // auto s = tile::internal::getGemmSizes(op_a, op_b, a.get(), b.get(), c);
+//   // blas::gemm(blas::Layout::ColMajor, op_a, op_b, s.m, s.n, s.k, alpha, a.get().ptr(), a.get().ld(),
+//   //            b.get().ptr(), b.get().ld(), beta, c.ptr(), c.ld());
+// }
 
 /// Computes matrix matrix multiplication where matrix @p a is hermitian (symmetric if T is real).
 template <class T>
@@ -74,6 +103,15 @@ void trsm(const blas::Side side, const blas::Uplo uplo, const blas::Op op, const
   auto s = tile::internal::getTrsmSizes(side, a, b);
   blas::trsm(blas::Layout::ColMajor, side, uplo, op, diag, s.m, s.n, alpha, a.ptr(), a.ld(), b.ptr(),
              b.ld());
+}
+
+template <class T>
+void trsm(const blas::Side side, const blas::Uplo uplo, const blas::Op op, const blas::Diag diag,
+          const T alpha, std::reference_wrapper<const Tile<const T, Device::CPU>> a,
+          const Tile<T, Device::CPU>& b) noexcept {
+  auto s = tile::internal::getTrsmSizes(side, a.get(), b);
+  blas::trsm(blas::Layout::ColMajor, side, uplo, op, diag, s.m, s.n, alpha, a.get().ptr(), a.get().ld(),
+             b.ptr(), b.ld());
 }
 
 #ifdef DLAF_WITH_CUDA
@@ -189,5 +227,22 @@ DLAF_MAKE_CALLABLE_OBJECT(her2k);
 DLAF_MAKE_CALLABLE_OBJECT(herk);
 DLAF_MAKE_CALLABLE_OBJECT(trsm);
 
+// TODO: Useful? Take only the predecessor sender, internally call transform.
+// template <Backend B, typename S>
+// decltype(auto) gemm(S&& s) {
+//   return transform<B>(std::forward<S>(s), gemm_o);
+// }
+
+// TODO: Or? Automatically wrap and lift arguments in when_all.
+// template <Backend B, typename... Ts>
+// decltype(auto) gemm(Ts&&... ts) {
+//   return transform<B>(when_all_lift(std::forward<Ts>(ts)...), gemm_o);
+// }
+
+// TODO: Or eagerly submitted? Additionally call detach.
+// template <Backend B, typename... Ts>
+// void gemm(Ts&&... ts) {
+//   ex::detach(transform<B>(when_all_lift(std::forward<Ts>(ts)...), gemm_o));
+// }
 }
 }

@@ -73,6 +73,16 @@ void set(MatrixType<T, Device::CPU>& mat, ElementGetter el) {
                                      tile_base_index.col() + tile_index.col()));
       };
       set(mat(tile_index).get(), el_tile);
+      // TODO: Sender equivalent is roughly this (readwrite_sender's value_types
+      // contains a proxy object):
+      // set(ex::sync_wait(mat.readwrite_sender(tile_index)), el_tile);
+      //
+      // OR (still a proxy object):
+      // set(ex::make_future(mat.readwrite_sender(tile_index)).get(), el_tile);
+      //
+      // NOTE: This is also possible with futures (change all .gets to sync_wait
+      // first?):
+      // set(ex::sync_wait(mat(tile_index)), el_tile);
     }
   }
 }

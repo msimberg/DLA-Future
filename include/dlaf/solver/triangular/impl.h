@@ -11,6 +11,13 @@
 
 #include <hpx/local/future.hpp>
 
+// TODO: Clean up unneeded includes
+#include <hpx/execution/algorithms/detach.hpp>
+#include <hpx/execution/algorithms/just.hpp>
+#include <hpx/execution/algorithms/on.hpp>
+#include <hpx/executors/p0443_executor.hpp>
+#include <hpx/synchronization/async_rw_mutex.hpp>
+
 #include "dlaf/blas/tile.h"
 #include "dlaf/common/index2d.h"
 #include "dlaf/common/pipeline.h"
@@ -24,6 +31,7 @@
 #include "dlaf/matrix/distribution.h"
 #include "dlaf/matrix/matrix.h"
 #include "dlaf/solver/triangular/api.h"
+#include "dlaf/transform.h"
 #include "dlaf/util_matrix.h"
 
 namespace dlaf {
@@ -82,6 +90,8 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
+  namespace ex = hpx::execution::experimental;
+
   constexpr auto Left = blas::Side::Left;
   constexpr auto Lower = blas::Uplo::Lower;
   constexpr auto NoTrans = blas::Op::NoTrans;
@@ -105,9 +115,29 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        hpx::dataflow(trailing_executor, matrix::unwrapExtendTiles(tile::gemm_o), op, NoTrans, beta,
-                      mat_a.read(LocalTileIndex{k, i}), mat_b.read(kj), T(1.0),
-                      mat_b(LocalTileIndex{i, j}));
+
+        // Futures as senders version:
+        ex::detach(
+            transform<backend>(when_all_lift(op, blas::Op::NoTrans, beta,
+                                             // TODO: Add read_sender for use in sender algorithms?
+                                             ex::keep_future(mat_a.read(LocalTileIndex{k, i})),
+                                             ex::keep_future(mat_b.read(kj)), T(1.0),
+                                             // mat_a.read(LocalTileIndex{i, j}),
+                                             // mat_b.read(kj), T(1.0),
+                                             mat_b(LocalTileIndex{i, j})),
+                               tile::gemm_o));
+        // Alternative:
+        // tile::gemm<backend> in place of tile::transform<backend>
+
+        // Pure sender version (with async_rw_mutex):
+        // - add versions of read and operator() to Matrix which return
+        //   async_rw_mutex senders
+        // - remove the keep_future calls
+
+        // Original dataflow/future version
+        // hpx::dataflow(trailing_executor, matrix::unwrapExtendTiles(tile::gemm_o), op, NoTrans, beta,
+        //               mat_a.read(LocalTileIndex{k, i}), mat_b.read(kj), T(1.0),
+        //               mat_b(LocalTileIndex{i, j}));
       }
     }
   }
