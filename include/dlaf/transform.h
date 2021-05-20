@@ -15,9 +15,8 @@
 #include "dlaf/types.h"
 
 #ifdef DLAF_WITH_CUDA
-// TODO: Only for the pools, not the executors
-#include "dlaf/cublas/executor.h"
-#include "dlaf/cuda/executor.h"
+#include "dlaf/cublas/handle_pool.h"
+#include "dlaf/cuda/stream_pool.h"
 #endif
 
 namespace dlaf {
