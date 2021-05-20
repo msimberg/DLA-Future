@@ -9,7 +9,9 @@
 //
 #pragma once
 
+#include <hpx/include/util.hpp>
 #include <hpx/local/future.hpp>
+#include <hpx/thread.hpp>
 
 #include "dlaf/blas/tile.h"
 #include "dlaf/common/index2d.h"
@@ -50,9 +52,9 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
       auto kj = LocalTileIndex{k, j};
 
       // Triangular solve of k-th row Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, blas::Op::NoTrans,
-                                diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
-                                mat_b.readwrite_sender(kj));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, blas::Op::NoTrans, diag,
+                               alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                               mat_b.readwrite_sender(kj));
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
@@ -60,9 +62,9 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::NoTrans, beta,
-                                  mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::NoTrans, beta,
+                                 mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -88,8 +90,8 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
     for (SizeType j = n - 1; j > -1; --j) {
       auto kj = LocalTileIndex{k, j};
       // Triangular solve of k-th row Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, op, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, op, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
@@ -98,9 +100,9 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
         auto beta = static_cast<T>(-1.0) / alpha;
 
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, op, blas::Op::NoTrans, beta,
-                                  mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, op, blas::Op::NoTrans, beta,
+                                 mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -125,8 +127,8 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
     for (SizeType j = n - 1; j > -1; --j) {
       auto kj = LocalTileIndex{k, j};
       // Triangular solve of k-th row Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Left, Upper, NoTrans, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Left, Upper, NoTrans, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
@@ -134,9 +136,9 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta,
-                                  mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta,
+                                 mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -162,8 +164,8 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
       auto kj = LocalTileIndex{k, j};
 
       // Triangular solve of k-th row Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Left, Upper, op, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Left, Upper, op, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
@@ -171,9 +173,9 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, op, NoTrans, beta,
-                                  mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, op, NoTrans, beta,
+                                 mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -199,8 +201,8 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Right, Lower, NoTrans, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Right, Lower, NoTrans, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
@@ -208,9 +210,9 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
-                                  mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
+                                 mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -236,8 +238,8 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Right, Lower, op, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Right, Lower, op, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
@@ -245,9 +247,9 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, NoTrans, op, beta, mat_b.read_sender(ik),
-                                  mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, NoTrans, op, beta, mat_b.read_sender(ik),
+                                 mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -273,8 +275,8 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Right, Upper, NoTrans, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Right, Upper, NoTrans, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
@@ -282,9 +284,9 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
-                                  mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
+                                 mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -310,8 +312,8 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      transform_detach<backend>(thread_priority::high, tile::trsm_o, Right, Upper, op, diag, alpha,
-                                mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
+      transformDetach<backend>(thread_priority::high, tile::trsm_o, Right, Upper, op, diag, alpha,
+                               mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
@@ -319,9 +321,9 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        transform_detach<backend>(priority, tile::gemm_o, NoTrans, op, beta, mat_b.read_sender(ik),
-                                  mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i, j}));
+        transformDetach<backend>(priority, tile::gemm_o, NoTrans, op, beta, mat_b.read_sender(ik),
+                                 mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -389,8 +391,8 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
       if (mat_b.rankIndex().row() == k_rank_row) {
         auto k_local_row = distr_b.localTileFromGlobalTile<Coord::Row>(k);
         auto kj = LocalTileIndex{k_local_row, j_local};
-        transform_detach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, blas::Op::NoTrans,
-                                  diag, alpha, ex::keep_future(kk_tile), mat_b.readwrite_sender(kj));
+        transformDetach<backend>(thread_priority::high, tile::trsm_o, Left, Lower, blas::Op::NoTrans,
+                                 diag, alpha, ex::keep_future(kk_tile), mat_b.readwrite_sender(kj));
 
         panel[j_local] = mat_b.read(kj);
         if (k != (mat_b.nrTiles().rows() - 1)) {
@@ -432,9 +434,9 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
       for (SizeType j_local = 0; j_local < b_local_cols; ++j_local) {
         auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
         T beta = T(-1.0) / alpha;
-        transform_detach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::NoTrans, beta,
-                                  ex::keep_future(ik_tile), ex::keep_future(panel[j_local]), T(1.0),
-                                  mat_b.readwrite_sender(LocalTileIndex{i_local, j_local}));
+        transformDetach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::NoTrans, beta,
+                                 ex::keep_future(ik_tile), ex::keep_future(panel[j_local]), T(1.0),
+                                 mat_b.readwrite_sender(LocalTileIndex{i_local, j_local}));
       }
     }
   }

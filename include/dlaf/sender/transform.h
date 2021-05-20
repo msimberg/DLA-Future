@@ -25,13 +25,13 @@ namespace internal {
 // DLAF-specific transform, templated on a backend. This, together with
 // when_all, takes the place of dataflow(executor, ...) for futures.
 template <Backend B>
-struct transform;
+struct Transform;
 
 // For Backend::MC we use the regular thread pool scheduler from HPX.
 template <>
-struct transform<Backend::MC> {
+struct Transform<Backend::MC> {
   template <typename S, typename F>
-  static auto call(S&& s, F&& f, hpx::threads::thread_priority priority) {
+  static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
     namespace ex = hpx::execution::experimental;
     return ex::transform(ex::on(std::forward<S>(s), ex::make_with_priority(ex::executor{}, priority)),
                          hpx::util::unwrapping(std::forward<F>(f)));
@@ -42,12 +42,12 @@ struct transform<Backend::MC> {
 // For Backend::GPU we use a custom sender. This currently handles CUDA stream
 // and cuBLAS handle functions.
 template <>
-struct transform<Backend::GPU> {
+struct Transform<Backend::GPU> {
   template <typename S, typename F>
-  struct gpu_transform_sender {
+  struct GPUTransformSender {
+    hpx::threads::thread_priority priority;
     std::decay_t<S> s;
     std::decay_t<F> f;
-    hpx::threads::thread_priority priority;
 
     // TODO: Non-void functions
     template <template <typename...> class Tuple, template <typename...> class Variant>
@@ -60,10 +60,10 @@ struct transform<Backend::GPU> {
     static constexpr bool sends_done = false;
 
     template <typename R>
-    struct gpu_transform_receiver {
+    struct GPUTransformReceiver {
+      hpx::threads::thread_priority priority;
       std::decay_t<R> r;
       std::decay_t<F> f;
-      hpx::threads::thread_priority priority;
 
       template <typename E>
           void set_error(E&& e) && noexcept {
@@ -123,14 +123,14 @@ struct transform<Backend::GPU> {
     template <typename R>
     auto connect(R&& r) && {
       return hpx::execution::experimental::connect(std::move(s),
-                                                   gpu_transform_receiver<R>{std::forward<R>(r),
-                                                                             std::move(f), priority});
+                                                   GPUTransformReceiver<R>{priority, std::forward<R>(r),
+                                                                           std::move(f)});
     }
   };
 
   template <typename S, typename F>
-  static auto call(S&& s, F&& f, hpx::threads::thread_priority priority) {
-    return gpu_transform_sender<S, F>{std::forward<S>(s), std::forward<F>(f), priority};
+  static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
+    return GPUTransformSender<S, F>{priority, std::forward<S>(s), std::forward<F>(f)};
   }
 };
 #endif
@@ -139,13 +139,13 @@ struct transform<Backend::GPU> {
 // Lazy transform. This does not submit the work and returns a sender.
 template <Backend B, typename F, typename... Ts>
 decltype(auto) transform(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
-  return internal::transform<B>::call(internal::whenAllLift(std::forward<Ts>(ts)...), std::forward<F>(f),
-                                      priority);
+  return internal::Transform<B>::call(priority, internal::whenAllLift(std::forward<Ts>(ts)...),
+                                      std::forward<F>(f));
 }
 
 // Fire-and-forget transform. This submits the work and returns void.
 template <Backend B, typename F, typename... Ts>
-void transform_detach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+void transformDetach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
   hpx::execution::experimental::detach(
       transform<B>(priority, std::forward<F>(f), std::forward<Ts>(ts)...));
 }

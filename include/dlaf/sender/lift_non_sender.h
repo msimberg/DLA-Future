@@ -19,12 +19,12 @@ namespace internal {
 // Utility to make a sender out of a non-sender (non-senders are wrapped in
 // just).
 template <typename S, typename = std::enable_if_t<hpx::execution::experimental::is_sender<S>::value>>
-decltype(auto) liftNonSenders(S&& s) {
+decltype(auto) liftNonSender(S&& s) {
   return std::forward<S>(s);
 }
 
 template <typename S, typename = std::enable_if_t<!hpx::execution::experimental::is_sender<S>::value>>
-auto liftNonSenders(S&& s) {
+auto liftNonSender(S&& s) {
   return hpx::execution::experimental::just(std::forward<S>(s));
 }
 }

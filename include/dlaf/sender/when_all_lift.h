@@ -22,7 +22,7 @@ namespace internal {
 // them to when_all.
 template <typename... Ts>
 auto whenAllLift(Ts&&... ts) {
-  return hpx::execution::experimental::when_all(liftNonSenders<Ts>(std::forward<Ts>(ts))...);
+  return hpx::execution::experimental::when_all(liftNonSender<Ts>(std::forward<Ts>(ts))...);
 }
 }
 }
