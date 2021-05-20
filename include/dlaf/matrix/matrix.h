@@ -131,8 +131,7 @@ public:
   }
 
   auto readwrite_sender(const LocalTileIndex& index) noexcept {
-    std::size_t i = to_sizet(tileLinearIndex(index));
-    return tile_rw_mutexes_[i].readwrite();
+    return this->operator()(index);
   }
 
   auto readwrite_sender(const GlobalTileIndex& index) {
@@ -188,8 +187,9 @@ public:
   }
 
   auto read_sender(const LocalTileIndex& index) noexcept {
-    std::size_t i = to_sizet(tileLinearIndex(index));
-    return tile_rw_mutexes_[i].read();
+    // We want to explicitly deal with the shared_future, no the const& to the
+    // value.
+    return hpx::execution::experimental::keep_future(read(index));
   }
 
   auto read_sender(const GlobalTileIndex& index) {
