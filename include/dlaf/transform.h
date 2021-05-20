@@ -39,11 +39,6 @@ auto when_all_lift(Ts&&... ts) {
 namespace internal {
 // DLAF-specific transform, templated on a backend. This, together with
 // when_all, takes the place of dataflow(executor, ...)
-
-// TODO: Priorities. Do backends need to be types (such that priorities can be
-// attached to them)? Should tile algorithms take backend-specific execution
-// policies? Should we go back to customizing hpx::execution::transform based on
-// a via/on predecessor sender?
 template <Backend B>
 struct transform;
 
@@ -51,9 +46,9 @@ struct transform;
 template <>
 struct transform<Backend::MC> {
   template <typename S, typename F>
-  static auto call(S&& s, F&& f) {
+  static auto call(S&& s, F&& f, hpx::threads::thread_priority priority) {
     namespace ex = hpx::execution::experimental;
-    return ex::transform(ex::on(std::forward<S>(s), ex::executor{}),
+    return ex::transform(ex::on(std::forward<S>(s), ex::make_with_priority(ex::executor{}, priority)),
                          hpx::util::unwrapping(std::forward<F>(f)));
   }
 };
@@ -67,6 +62,7 @@ struct transform<Backend::GPU> {
   struct gpu_transform_sender {
     std::decay_t<S> s;
     std::decay_t<F> f;
+    hpx::threads::thread_priority priority;
 
     // TODO: Non-void functions
     template <template <typename...> class Tuple, template <typename...> class Variant>
@@ -96,7 +92,10 @@ struct transform<Backend::GPU> {
       void set_value(Ts&&... ts) {
         // TODO: Dispatch with cuda stream, cublas handle, or cusolver handle
         // depending on what works.
-        auto stream_pool = getNpCudaStreamPool();
+        // TODO: This is accessed when the predecessor is ready. Do we need to
+        // access the stream/handle pools earlier?
+        auto stream_pool = priority >= hpx::threads::thread_priority::high ? getHpCudaStreamPool()
+                                                                           : getNpCudaStreamPool();
         auto handle_pool = getCublasHandlePool();
         cudaStream_t stream = stream_pool.getNextStream();
         cublasHandle_t handle = handle_pool.getNextHandle(stream);
@@ -144,16 +143,17 @@ struct transform<Backend::GPU> {
   };
 
   template <typename S, typename F>
-  static auto call(S&& s, F&& f) {
-    return gpu_transform_sender<S, F>{std::forward<S>(s), std::forward<F>(f)};
+  static auto call(S&& s, F&& f, hpx::threads::thread_priority priority) {
+    return gpu_transform_sender<S, F>{std::forward<S>(s), std::forward<F>(f), priority};
   }
 };
 #endif
 }
 
 template <Backend B, typename S, typename F>
-decltype(auto) transform(S&& s, F&& f) {
-  return internal::transform<B>::call(std::forward<S>(s), std::forward<F>(f));
+decltype(auto) transform(
+    S&& s, F&& f, hpx::threads::thread_priority priority = hpx::threads::thread_priority::normal) {
+  return internal::transform<B>::call(std::forward<S>(s), std::forward<F>(f), priority);
 }
 
 // TODO: operator| overloads, if useful
