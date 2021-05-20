@@ -12,6 +12,7 @@
 #include <hpx/local/execution.hpp>
 
 #include "dlaf/init.h"
+#include "dlaf/sender/when_all_lift.h"
 #include "dlaf/types.h"
 
 #ifdef DLAF_WITH_CUDA
@@ -20,25 +21,9 @@
 #endif
 
 namespace dlaf {
-// TODO: Upstream. In what form? execution::dataflow equivalent to
-// when_all_lift | on | transform?
-template <typename S, typename = std::enable_if_t<hpx::execution::experimental::is_sender<S>::value>>
-decltype(auto) lift_non_senders(S&& s) {
-  return std::forward<S>(s);
-}
-
-template <typename S, typename = std::enable_if_t<!hpx::execution::experimental::is_sender<S>::value>>
-auto lift_non_senders(S&& s) {
-  return hpx::execution::experimental::just(std::forward<S>(s));
-}
-
-template <typename... Ts>
-auto when_all_lift(Ts&&... ts) {
-  return hpx::execution::experimental::when_all(lift_non_senders<Ts>(std::forward<Ts>(ts))...);
-}
 namespace internal {
 // DLAF-specific transform, templated on a backend. This, together with
-// when_all, takes the place of dataflow(executor, ...)
+// when_all, takes the place of dataflow(executor, ...) for futures.
 template <Backend B>
 struct transform;
 
@@ -78,6 +63,7 @@ struct transform<Backend::GPU> {
     struct gpu_transform_receiver {
       std::decay_t<R> r;
       std::decay_t<F> f;
+      hpx::threads::thread_priority priority;
 
       template <typename E>
           void set_error(E&& e) && noexcept {
@@ -138,7 +124,7 @@ struct transform<Backend::GPU> {
     auto connect(R&& r) && {
       return hpx::execution::experimental::connect(std::move(s),
                                                    gpu_transform_receiver<R>{std::forward<R>(r),
-                                                                             std::move(f)});
+                                                                             std::move(f), priority});
     }
   };
 
@@ -150,11 +136,17 @@ struct transform<Backend::GPU> {
 #endif
 }
 
-template <Backend B, typename S, typename F>
-decltype(auto) transform(
-    S&& s, F&& f, hpx::threads::thread_priority priority = hpx::threads::thread_priority::normal) {
-  return internal::transform<B>::call(std::forward<S>(s), std::forward<F>(f), priority);
+// Lazy transform. This does not submit the work and returns a sender.
+template <Backend B, typename F, typename... Ts>
+decltype(auto) transform(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+  return internal::transform<B>::call(internal::whenAllLift(std::forward<Ts>(ts)...), std::forward<F>(f),
+                                      priority);
 }
 
-// TODO: operator| overloads, if useful
+// Fire-and-forget transform. This submits the work and returns void.
+template <Backend B, typename F, typename... Ts>
+void transform_detach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+  hpx::execution::experimental::detach(
+      transform<B>(priority, std::forward<F>(f), std::forward<Ts>(ts)...));
+}
 }

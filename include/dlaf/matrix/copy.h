@@ -15,6 +15,7 @@
 
 #include "dlaf/executors.h"
 #include "dlaf/matrix/copy_tile.h"
+#include "dlaf/sender/transform.h"
 #include "dlaf/types.h"
 #include "dlaf/util_matrix.h"
 
@@ -36,10 +37,16 @@ void copy(Matrix<const T, Source>& source, Matrix<T, Destination>& dest) {
   const SizeType local_tile_rows = distribution.localNrTiles().rows();
   const SizeType local_tile_cols = distribution.localNrTiles().cols();
 
-  for (SizeType j = 0; j < local_tile_cols; ++j)
-    for (SizeType i = 0; i < local_tile_rows; ++i)
-      hpx::dataflow(dlaf::getCopyExecutor<Source, Destination>(), unwrapExtendTiles(copy_o),
-                    source.read(LocalTileIndex(i, j)), dest(LocalTileIndex(i, j)));
+  for (SizeType j = 0; j < local_tile_cols; ++j) {
+    for (SizeType i = 0; i < local_tile_rows; ++i) {
+      transform<internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
+                                                                   copy_o,
+                                                                   source.read_sender(
+                                                                       LocalTileIndex(i, j)),
+                                                                   dest.readwrite_sender(
+                                                                       LocalTileIndex(i, j)));
+    }
+  }
 }
 }
 }

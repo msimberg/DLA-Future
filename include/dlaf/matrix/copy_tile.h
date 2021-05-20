@@ -22,10 +22,36 @@
 #include "dlaf/executors.h"
 #include "dlaf/lapack/tile.h"
 #include "dlaf/matrix/tile.h"
+#include "dlaf/sender/transform.h"
 
 namespace dlaf {
 namespace matrix {
 namespace internal {
+template <Device Source, Device Destination>
+struct CopyBackend;
+
+template <>
+struct CopyBackend<Device::CPU, Device::CPU> {
+  static constexpr Backend value = Backend::MC;
+};
+
+#ifdef DLAF_WITH_CUDA
+template <>
+struct CopyBackend<Device::CPU, Device::GPU> {
+  static constexpr Backend value = Backend::GPU;
+};
+
+template <>
+struct CopyBackend<Device::GPU, Device::CPU> {
+  static constexpr Backend value = Backend::GPU;
+};
+
+template <>
+struct CopyBackend<Device::GPU, Device::GPU> {
+  static constexpr Backend value = Backend::GPU;
+};
+#endif
+
 template <typename T, Device Source, Device Destination>
 struct CopyTile;
 
@@ -155,32 +181,22 @@ struct Duplicate {
   }
 };
 
-namespace internal {
-template <Device Destination, Device Source>
-struct DuplicateIfNeeded {
-  template <typename T, template <class> class Future>
-  static auto call(Future<Tile<T, Source>> tile) {
-    return getUnwrapReturnValue(hpx::dataflow(dlaf::getCopyExecutor<Source, Destination>(),
-                                              unwrapExtendTiles(Duplicate<Destination>{}), tile));
-  }
-};
-
-template <Device SourceDestination>
-struct DuplicateIfNeeded<SourceDestination, SourceDestination> {
-  template <typename T, template <class> class Future>
-  static auto call(Future<Tile<T, SourceDestination>> tile) {
-    return tile;
-  }
-};
-}
-
 /// Helper function for duplicating an input tile to Destination asynchronously,
 /// but only if the destination device is different from the source device.
 ///
 /// When Destination and Source are the same, returns the input tile unmodified.
 template <Device Destination, typename T, Device Source, template <class> class Future>
 auto duplicateIfNeeded(Future<Tile<T, Source>> tile) {
-  return internal::DuplicateIfNeeded<Destination, Source>::call(std::move(tile));
+  if constexpr (Source == Destination) {
+    return tile;
+  }
+  else {
+    return hpx::execution::experimental::make_future(
+        dlaf::transform<
+            internal::CopyBackend<Source, Destination>>(hpx::threads::thread_priority::normal,
+                                                        dlaf::matrix::Duplicate<Destination>{},
+                                                        std::move(tile)));
+  }
 }
 }
 }
