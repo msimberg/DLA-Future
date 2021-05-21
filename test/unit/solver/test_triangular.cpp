@@ -137,21 +137,16 @@ void testTriangularSolver(comm::CommunicatorGrid grid, blas::Side side, blas::Up
     std::tie(el_op_a, el_b, res_b) =
         getRightTriangularSystem<GlobalElementIndex, T>(uplo, op, diag, alpha, n);
 
-  // TODO: This requires set to know about senders.
   set(mat_ah, el_op_a, op);
   set(mat_bh, el_b);
 
   {
-    // Plain access does not require any special adaptation for senders. TODO:
-    // Copying requires adaptation for senders.
     MatrixMirror<T, D, Device::CPU> mat_a(mat_ah);
     MatrixMirror<T, D, Device::CPU> mat_b(mat_bh);
 
-    // TODO: The algorithm itself needs to know about senders.
     solver::triangular<B, D, T>(grid, side, uplo, op, diag, alpha, mat_a.get(), mat_b.get());
   }
 
-  // TODO: This probably also needs to know about senders.
   CHECK_MATRIX_NEAR(res_b, mat_bh, 20 * (mat_bh.size().rows() + 1) * TypeUtilities<T>::error,
                     20 * (mat_bh.size().rows() + 1) * TypeUtilities<T>::error);
 }

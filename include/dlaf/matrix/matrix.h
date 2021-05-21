@@ -15,8 +15,6 @@
 
 #include <hpx/local/future.hpp>
 
-#include <hpx/synchronization/async_rw_mutex.hpp>
-
 #include "dlaf/communication/communicator_grid.h"
 #include "dlaf/matrix/distribution.h"
 #include "dlaf/matrix/internal/tile_future_manager.h"
@@ -144,7 +142,6 @@ protected:
 private:
   using Matrix<const T, device>::setUpTiles;
   using Matrix<const T, device>::tile_managers_;
-  using Matrix<const T, device>::tile_rw_mutexes_;
 };
 
 template <class T, Device device>
@@ -208,7 +205,6 @@ protected:
   void setUpTiles(const memory::MemoryView<ElementType, device>& mem, const LayoutInfo& layout) noexcept;
 
   std::vector<internal::TileFutureManager<T, device>> tile_managers_;
-  std::vector<hpx::experimental::async_rw_mutex<Tile<T, device>, Tile<const T, device>>> tile_rw_mutexes_;
 };
 
 // Note: the templates of the following helper functions are inverted w.r.t. the Matrix templates

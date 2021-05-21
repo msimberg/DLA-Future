@@ -25,8 +25,6 @@
 #include "dlaf/matrix/copy_tile.h"
 #include "dlaf/matrix/tile.h"
 
-#include <hpx/synchronization/async_rw_mutex.hpp>
-
 namespace dlaf {
 namespace comm {
 namespace sync {
@@ -41,7 +39,6 @@ void send(Communicator& communicator, DataIn&& message_to_send) {
   using DataT = std::remove_const_t<typename common::data_traits<decltype(data)>::element_t>;
 
   auto message = comm::make_message(std::move(data));
-  // std::cerr << "send with data = " << message.data() << " and size " << message.count() << "\n";
   DLAF_MPI_CALL(MPI_Bcast(const_cast<DataT*>(message.data()), message.count(), message.mpi_type(),
                           communicator.rank(), communicator));
 }
@@ -53,105 +50,8 @@ template <class DataOut>
 void receive_from(const int broadcaster_rank, Communicator& communicator, DataOut&& data) {
   DLAF_ASSERT_HEAVY(broadcaster_rank != communicator.rank(), broadcaster_rank, communicator.rank());
   auto message = comm::make_message(common::make_data(std::forward<DataOut>(data)));
-  // std::cerr << "receive with data = " << message.data() << " and size " << message.count() << "\n";
   DLAF_MPI_CALL(
       MPI_Bcast(message.data(), message.count(), message.mpi_type(), broadcaster_rank, communicator));
-}
-}
-}
-
-// TODO: These are here only temporarily. MPI handling has changed.
-
-/// Task for broadcasting (send endpoint) a Tile in a direction over a CommunicatorGrid
-template <class T>
-void sendTile(hpx::future<common::PromiseGuard<comm::CommunicatorGrid>> mpi_task_chain, Coord rc_comm,
-              hpx::shared_future<matrix::Tile<const T, Device::CPU>> tile) {
-  using PromiseComm_t = common::PromiseGuard<comm::CommunicatorGrid>;
-
-  PromiseComm_t pcomm = mpi_task_chain.get();
-  comm::sync::broadcast::send(pcomm.ref().subCommunicator(rc_comm), tile.get());
-}
-
-template <class T>
-void sendTile(common::PromiseGuard<comm::CommunicatorGrid> pcomm, Coord rc_comm,
-              std::reference_wrapper<const matrix::Tile<const T, Device::CPU>> tile) {
-  comm::sync::broadcast::send(pcomm.ref().subCommunicator(rc_comm), tile.get());
-}
-
-template <class T>
-void sendTile(hpx::experimental::async_rw_mutex<comm::CommunicatorGrid>::readwrite_access_type pcomm,
-              Coord rc_comm, std::reference_wrapper<const matrix::Tile<const T, Device::CPU>> tile) {
-  comm::CommunicatorGrid& pcomm_ref = pcomm;
-  comm::sync::broadcast::send(pcomm_ref.subCommunicator(rc_comm), tile.get());
-}
-
-template <class T>
-void sendTile(hpx::experimental::async_rw_mutex<comm::CommunicatorGrid>::readwrite_access_type pcomm,
-              Coord rc_comm, matrix::Tile<const T, Device::CPU> const& tile) {
-  comm::CommunicatorGrid& pcomm_ref = pcomm;
-  comm::sync::broadcast::send(pcomm_ref.subCommunicator(rc_comm), tile);
-}
-
-DLAF_MAKE_CALLABLE_OBJECT(sendTile);
-
-/// Task for broadcasting (receiving endpoint) a Tile in a direction over a CommunicatorGrid
-template <class T>
-void recvTile(hpx::future<common::PromiseGuard<comm::CommunicatorGrid>> mpi_task_chain, Coord rc_comm,
-              hpx::future<matrix::Tile<T, Device::CPU>> tile, comm::IndexT_MPI rank) {
-  using PromiseComm_t = common::PromiseGuard<comm::CommunicatorGrid>;
-
-  PromiseComm_t pcomm = mpi_task_chain.get();
-  comm::sync::broadcast::receive_from(rank, pcomm.ref().subCommunicator(rc_comm), tile.get());
-}
-
-DLAF_MAKE_CALLABLE_OBJECT(recvTile);
-
-/// Task for broadcasting (receiving endpoint) a Tile ("JIT" allocation) in a direction over a CommunicatorGrid
-template <class T>
-matrix::Tile<const T, Device::CPU> recvAllocTile(
-    hpx::future<common::PromiseGuard<comm::CommunicatorGrid>> mpi_task_chain, Coord rc_comm,
-    TileElementSize tile_size, comm::IndexT_MPI rank) {
-  using ConstTile_t = matrix::Tile<const T, Device::CPU>;
-  using PromiseComm_t = common::PromiseGuard<comm::CommunicatorGrid>;
-  using MemView_t = memory::MemoryView<T, Device::CPU>;
-  using Tile_t = matrix::Tile<T, Device::CPU>;
-
-  PromiseComm_t pcomm = mpi_task_chain.get();
-  MemView_t mem_view(tile_size.linear_size());
-  Tile_t tile(tile_size, std::move(mem_view), tile_size.rows());
-  comm::sync::broadcast::receive_from(rank, pcomm.ref().subCommunicator(rc_comm), tile);
-  return ConstTile_t(std::move(tile));
-}
-
-/// Task for broadcasting (receiving endpoint) a Tile ("JIT" allocation) in a direction over a
-/// CommunicatorGrid
-template <class T>
-matrix::Tile<const T, Device::CPU> recvAllocTileSender(common::PromiseGuard<comm::CommunicatorGrid> pcomm,
-                                                       Coord rc_comm, TileElementSize tile_size,
-                                                       comm::IndexT_MPI rank) {
-  using ConstTile_t = matrix::Tile<const T, Device::CPU>;
-  using MemView_t = memory::MemoryView<T, Device::CPU>;
-  using Tile_t = matrix::Tile<T, Device::CPU>;
-
-  MemView_t mem_view(tile_size.linear_size());
-  Tile_t tile(tile_size, std::move(mem_view), tile_size.rows());
-  comm::sync::broadcast::receive_from(rank, pcomm.ref().subCommunicator(rc_comm), tile);
-  return ConstTile_t(std::move(tile));
-}
-
-template <class T>
-matrix::Tile<const T, Device::CPU> recvAllocTileSenderMutex(
-    hpx::experimental::async_rw_mutex<comm::CommunicatorGrid>::readwrite_access_type pcomm,
-    Coord rc_comm, TileElementSize tile_size, comm::IndexT_MPI rank) {
-  using ConstTile_t = matrix::Tile<const T, Device::CPU>;
-  using MemView_t = memory::MemoryView<T, Device::CPU>;
-  using Tile_t = matrix::Tile<T, Device::CPU>;
-
-  MemView_t mem_view(tile_size.linear_size());
-  Tile_t tile(tile_size, std::move(mem_view), tile_size.rows());
-  comm::CommunicatorGrid& pcomm_ref = pcomm;
-  comm::sync::broadcast::receive_from(rank, pcomm_ref.subCommunicator(rc_comm), tile);
-  return ConstTile_t(std::move(tile));
 }
 }
 }

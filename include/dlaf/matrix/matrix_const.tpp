@@ -70,10 +70,6 @@ void Matrix<const T, device>::setUpTiles(const memory::MemoryView<ElementType, d
       tile_managers_.emplace_back(
           TileType(tile_size, MemView(mem, layout.tileOffset(ind), layout.minTileMemSize(tile_size)),
                    layout.ldTile()));
-      // TODO: This is currently duplicated. Only one of the two is needed.
-      tile_rw_mutexes_.emplace_back(
-          TileType(tile_size, MemView(mem, layout.tileOffset(ind), layout.minTileMemSize(tile_size)),
-                   layout.ldTile()));
     }
   }
 }

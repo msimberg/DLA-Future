@@ -11,7 +11,8 @@
 
 #include <hpx/include/util.hpp>
 #include <hpx/local/future.hpp>
-#include <hpx/thread.hpp>
+#include <hpx/local/execution.hpp>
+#include <hpx/local/thread.hpp>
 
 #include "dlaf/blas/tile.h"
 #include "dlaf/common/index2d.h"

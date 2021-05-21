@@ -45,28 +45,60 @@ template <>
 struct Transform<Backend::GPU> {
   template <typename S, typename F>
   struct GPUTransformSender {
-    hpx::threads::thread_priority priority;
+    cuda::StreamPool stream_pool;
+    cublas::HandlePool handle_pool;
     std::decay_t<S> s;
     std::decay_t<F> f;
 
-    // TODO: Non-void functions
-    template <template <typename...> class Tuple, template <typename...> class Variant>
-    using value_types = Variant<Tuple<>>;
+    template <typename G, typename... Us>
+    static auto call_helper(cudaStream_t stream, cublasHandle_t handle, G&& g, Us&... ts) {
+      using unwrapping_function_type = decltype(hpx::util::unwrapping(std::move(g)));
+      static_assert(std::is_invocable_v<unwrapping_function_type, Ts..., cudaStream_t> ||
+                        std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Ts...>,
+                    "function passed to transform<GPU> must be invocable with a cublasStream_t as the "
+                    "last argument or a cublasHandle_t as the first argument");
 
-    // TODO: Add predecessor error_types
+      if constexpr (std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t>) {
+        return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), ts..., stream);
+      }
+      else if constexpr (std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...>) {
+        return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), handle, ts...);
+      }
+    }
+
+    template <typename Tuple>
+    struct invoke_result_helper;
+
+    template <template <typename...> class Tuple, typename... Ts>
+    struct invoke_result_helper<Tuple<Ts...>> {
+      using result_type =
+          decltype(call_helper(std::declval<cudaStream_t>(), std::declval<cublasHandle_t>(),
+                               std::declval<G>(), std::declval<Ts>()...));
+      using type =
+          typename std::conditional<std::is_void<result_type>::value, Tuple<>, Tuple<result_type>>::type;
+    }
+
+    template <template <typename...> class Tuple, template <typename...> class Variant>
+    using value_types = hpx::util::detail::unique_t<hpx::util::detail::transform_t<
+        typename hpx::execution::experimental::sender_traits<S>::template value_types<Tuple, Variant>,
+        invoke_result_helper>>;
+
     template <template <typename...> class Variant>
-    using error_types = Variant<std::exception_ptr>;
+    using error_types = hpx::util::detail::unique_t<hpx::util::detail::prepend_t<
+        typename hpx::execution::experimental::sender_traits<S>::template error_types<Variant>,
+        std::exception_ptr>>;
 
     static constexpr bool sends_done = false;
 
     template <typename R>
     struct GPUTransformReceiver {
-      hpx::threads::thread_priority priority;
+      cuda::StreamPool stream_pool;
+      cublas::HandlePool handle_pool;
       std::decay_t<R> r;
       std::decay_t<F> f;
 
       template <typename E>
-          void set_error(E&& e) && noexcept {
+      void set_error(E&& e) && noexcept {
         hpx::execution::experimental::set_error(std::move(r), std::forward<E>(e));
       }
 
@@ -75,62 +107,50 @@ struct Transform<Backend::GPU> {
       }
 
       template <typename... Ts>
-      void set_value(Ts&&... ts) {
-        // TODO: Dispatch with cuda stream, cublas handle, or cusolver handle
-        // depending on what works.
-        // TODO: This is accessed when the predecessor is ready. Do we need to
-        // access the stream/handle pools earlier?
-        auto stream_pool = priority >= hpx::threads::thread_priority::high ? getHpCudaStreamPool()
-                                                                           : getNpCudaStreamPool();
-        auto handle_pool = getCublasHandlePool();
-        cudaStream_t stream = stream_pool.getNextStream();
-        cublasHandle_t handle = handle_pool.getNextHandle(stream);
+      void set_value(Ts&&... ts) noexcept {
+        try {
+          cudaStream_t stream = stream_pool.getNextStream();
+          cublasHandle_t handle = handle_pool.getNextHandle(stream);
 
-        // TODO: Non-void functions
-        // TODO: Exception handling
+          // NOTE: ts is not forwarded because we keep the pack alive longer in
+          // the continuation.
+          call_helper(stream, handle, std::move(f), ts...);
 
-        // NOTE: ts is not forwarded because we keep the pack alive longer in
-        // the continuation.
-        using unwrapping_function_type = decltype(hpx::util::unwrapping(std::move(f)));
-        static_assert(
-            std::is_invocable_v<unwrapping_function_type, Ts..., cudaStream_t> ||
-                std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Ts...>,
-            "function passed to transform<GPU> must be invocable with a cublasStream_t as the last argument or a cublasHandle_t as the first argument");
-
-        if constexpr (std::is_invocable_v<unwrapping_function_type, Ts..., cudaStream_t>) {
-          std::invoke(hpx::util::unwrapping(std::move(f)), ts..., stream);
+          // TODO: This does not need a full future. It allocates two shared
+          // states: one for the future returned from get_future_with_event, and
+          // one for the future returned from future::then. A callback triggered
+          // by event completion would be enough (that likely implies one heap
+          // allocation, however). Update this when generic event functionality is
+          // available in HPX.
+          hpx::future<void> fut = hpx::cuda::experimental::detail::get_future_with_event(stream);
+          fut.then(hpx::launch::sync,
+                   [r = std::move(r),
+                    keep_alive = std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
+                                                 std::move(handle_pool))](hpx::future<void>&&) mutable {
+                     hpx::execution::experimental::set_value(std::move(r));
+                   });
         }
-        else if constexpr (std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Ts...>) {
-          std::invoke(hpx::util::unwrapping(std::move(f)), handle, ts...);
+        catch (...) {
+          hpx::execution::experimental::set_error(std::move(r), std::current_exception());
         }
-        // TODO: cusolver case
-
-        // TODO: This does not need a full future. It allocates two shared
-        // states: one for the future returned from get_future_with_event, and
-        // one for the future returned from future::then. A callback triggered
-        // by event completion would be enough (that likely implies one heap
-        // allocation, however).
-        hpx::future<void> fut = hpx::cuda::experimental::detail::get_future_with_event(stream);
-        fut.then(hpx::launch::sync,
-                 [r = std::move(r),
-                  keep_alive = std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
-                                               std::move(handle_pool))](hpx::future<void>&&) mutable {
-                   hpx::execution::experimental::set_value(std::move(r));
-                 });
       }
     };
 
     template <typename R>
     auto connect(R&& r) && {
       return hpx::execution::experimental::connect(std::move(s),
-                                                   GPUTransformReceiver<R>{priority, std::forward<R>(r),
+                                                   GPUTransformReceiver<R>{stream_pool, handle_pool,
+                                                                           std::forward<R>(r),
                                                                            std::move(f)});
     }
   };
 
   template <typename S, typename F>
   static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
-    return GPUTransformSender<S, F>{priority, std::forward<S>(s), std::forward<F>(f)};
+    return GPUTransformSender<S, F>{priority >= hpx::threads::thread_priority::high
+                                        ? getHpCudaStreamPool()
+                                        : getNpCudaStreamPool(),
+                                    getCublasHandlePool(), std::forward<S>(s), std::forward<F>(f)};
   }
 };
 #endif
