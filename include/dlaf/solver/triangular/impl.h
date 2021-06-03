@@ -10,8 +10,8 @@
 #pragma once
 
 #include <hpx/include/util.hpp>
-#include <hpx/local/future.hpp>
 #include <hpx/local/execution.hpp>
+#include <hpx/local/future.hpp>
 #include <hpx/local/thread.hpp>
 
 #include "dlaf/blas/tile.h"
@@ -42,9 +42,6 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
   constexpr auto Lower = blas::Uplo::Lower;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -59,7 +56,7 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -81,9 +78,6 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
   constexpr auto Lower = blas::Uplo::Lower;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -96,7 +90,7 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
 
@@ -118,9 +112,6 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
   constexpr auto Upper = blas::Uplo::Upper;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -133,7 +124,7 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -154,9 +145,6 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
   constexpr auto Upper = blas::Uplo::Upper;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -170,7 +158,7 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -191,9 +179,6 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
   constexpr auto Lower = blas::Uplo::Lower;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -207,7 +192,7 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -228,9 +213,6 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
   constexpr auto Lower = blas::Uplo::Lower;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -244,7 +226,7 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -265,9 +247,6 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
   constexpr auto Upper = blas::Uplo::Upper;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -281,7 +260,7 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -302,9 +281,6 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
   constexpr auto Upper = blas::Uplo::Upper;
   constexpr auto NoTrans = blas::Op::NoTrans;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
-
   SizeType m = mat_b.nrTiles().rows();
   SizeType n = mat_b.nrTiles().cols();
 
@@ -318,7 +294,7 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
+        const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
@@ -345,8 +321,6 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
   using common::internal::vector;
   using ConstTileType = typename Matrix<T, device>::ConstTileType;
 
-  auto executor_hp = dlaf::getHpExecutor<backend>();
-  auto executor_np = dlaf::getNpExecutor<backend>();
   auto executor_mpi = dlaf::getMPIExecutor<backend>();
 
   // Set up MPI
@@ -414,7 +388,7 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
       auto i = distr_a.globalTileFromLocalTile<Coord::Row>(i_local);
 
       // Choose queue priority
-      auto& trailing_executor = (i == k + 1) ? executor_hp : executor_np;
+      const auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
 
       hpx::shared_future<ConstTileType> ik_tile;
 
@@ -433,7 +407,6 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
 
       // Update trailing matrix
       for (SizeType j_local = 0; j_local < b_local_cols; ++j_local) {
-        auto priority = (i == k - 1) ? thread_priority::high : thread_priority::normal;
         T beta = T(-1.0) / alpha;
         transformDetach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::NoTrans, beta,
                                  ex::keep_future(ik_tile), ex::keep_future(panel[j_local]), T(1.0),
