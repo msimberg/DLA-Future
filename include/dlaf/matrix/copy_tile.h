@@ -185,17 +185,32 @@ struct Duplicate {
 /// but only if the destination device is different from the source device.
 ///
 /// When Destination and Source are the same, returns the input tile unmodified.
-template <Device Destination, typename T, Device Source, template <class> class Future>
-auto duplicateIfNeeded(Future<Tile<T, Source>> tile) {
+template <Device Destination, typename T, Device Source>
+auto duplicateIfNeeded(hpx::future<Tile<T, Source>> tile) {
   if constexpr (Source == Destination) {
     return tile;
   }
   else {
     return hpx::execution::experimental::make_future(
         dlaf::transform<
-            internal::CopyBackend<Source, Destination>>(hpx::threads::thread_priority::normal,
-                                                        dlaf::matrix::Duplicate<Destination>{},
-                                                        std::move(tile)));
+            internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
+                                                               dlaf::matrix::Duplicate<Destination>{},
+                                                               std::move(tile)));
+  }
+}
+
+template <Device Destination, typename T, Device Source>
+auto duplicateIfNeeded(hpx::shared_future<Tile<T, Source>> tile) {
+  if constexpr (Source == Destination) {
+    return tile;
+  }
+  else {
+    return hpx::execution::experimental::make_future(
+        dlaf::transform<
+            internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
+                                                               dlaf::matrix::Duplicate<Destination>{},
+                                                               hpx::execution::experimental::keep_future(
+                                                                   std::move(tile))));
   }
 }
 }

@@ -39,12 +39,12 @@ void copy(Matrix<const T, Source>& source, Matrix<T, Destination>& dest) {
 
   for (SizeType j = 0; j < local_tile_cols; ++j) {
     for (SizeType i = 0; i < local_tile_rows; ++i) {
-      transform<internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
-                                                                   copy_o,
-                                                                   source.read_sender(
-                                                                       LocalTileIndex(i, j)),
-                                                                   dest.readwrite_sender(
-                                                                       LocalTileIndex(i, j)));
+      transformDetach<
+          internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
+                                                             copy_o,
+                                                             source.read_sender(LocalTileIndex(i, j)),
+                                                             dest.readwrite_sender(
+                                                                 LocalTileIndex(i, j)));
     }
   }
 }
