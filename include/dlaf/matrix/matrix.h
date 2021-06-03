@@ -184,7 +184,7 @@ public:
   }
 
   auto read_sender(const LocalTileIndex& index) noexcept {
-    // We want to explicitly deal with the shared_future, no the const& to the
+    // We want to explicitly deal with the shared_future, not the const& to the
     // value.
     return hpx::execution::experimental::keep_future(read(index));
   }
