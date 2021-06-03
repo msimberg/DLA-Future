@@ -17,13 +17,12 @@
 #include <cstddef>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <cuda_runtime.h>
 
-#include <hpx/functional.hpp>
-#include <hpx/future.hpp>
 #include <hpx/include/util.hpp>
-#include <hpx/runtime.hpp>
+#include <hpx/local/runtime.hpp>
 #include <hpx/thread.hpp>
 
 #include "dlaf/common/assert.h"

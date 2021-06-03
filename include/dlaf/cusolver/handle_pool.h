@@ -19,32 +19,29 @@
 #include <utility>
 #include <vector>
 
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
+#include <cusolverDn.h>
 
 #include <hpx/local/runtime.hpp>
 
 #include "dlaf/common/assert.h"
-#include "dlaf/cublas/error.h"
 #include "dlaf/cuda/error.h"
-#include "dlaf/cuda/executor.h"
+#include "dlaf/cusolver/error.h"
 
 namespace dlaf {
-namespace cublas {
+namespace cusolver {
 namespace internal {
 class HandlePoolImpl {
   int device_;
   std::size_t num_worker_threads_ = hpx::get_num_worker_threads();
-  std::vector<cublasHandle_t> handles_;
-  cublasPointerMode_t ptr_mode_;
+  std::vector<cusolverDnHandle_t> handles_;
 
 public:
-  HandlePoolImpl(int device, cublasPointerMode_t ptr_mode)
-      : device_(device), handles_(num_worker_threads_), ptr_mode_(ptr_mode) {
+  HandlePoolImpl(int device) : device_(device), handles_(num_worker_threads_) {
     DLAF_CUDA_CALL(cudaSetDevice(device_));
 
     for (auto& h : handles_) {
-      DLAF_CUBLAS_CALL(cublasCreate(&h));
+      DLAF_CUSOLVER_CALL(cusolverDnCreate(&h));
     }
   }
 
@@ -55,15 +52,14 @@ public:
 
   ~HandlePoolImpl() {
     for (auto& h : handles_) {
-      DLAF_CUBLAS_CALL(cublasDestroy(h));
+      DLAF_CUSOLVER_CALL(cusolverDnDestroy(h));
     }
   }
 
-  cublasHandle_t getNextHandle(cudaStream_t stream) {
-    cublasHandle_t handle = handles_[hpx::get_worker_thread_num()];
+  cusolverDnHandle_t getNextHandle(cudaStream_t stream) {
+    cusolverDnHandle_t handle = handles_[hpx::get_worker_thread_num()];
     DLAF_CUDA_CALL(cudaSetDevice(device_));
-    DLAF_CUBLAS_CALL(cublasSetStream(handle, stream));
-    DLAF_CUBLAS_CALL(cublasSetPointerMode(handle, ptr_mode_));
+    DLAF_CUSOLVER_CALL(cusolverDnSetStream(handle, stream));
     return handle;
   }
 
@@ -73,19 +69,18 @@ public:
 };
 }
 
-/// A pool of cuBLAS handles with reference semantics (copying points to the
-/// same underlying cuBLAS handles, last reference destroys the references).
-/// Allows access to cuBLAS handles associated with a particular stream. The
+/// A pool of cuSOLVER handles with reference semantics (copying points to the
+/// same underlying cuSOLVER handles, last reference destroys the handles).
+/// Allows access to cuSOLVER handles associated with a particular stream. The
 /// user must ensure that the handle pool and the stream use the same device.
-/// Each HPX worker thread is assigned thread local cuBLAS handle.
+/// Each HPX worker thread is assigned thread local cuSOLVER handle.
 class HandlePool {
   std::shared_ptr<internal::HandlePoolImpl> handles_ptr_;
 
 public:
-  HandlePool(int device = 0, cublasPointerMode_t ptr_mode = CUBLAS_POINTER_MODE_HOST)
-      : handles_ptr_(std::make_shared<internal::HandlePoolImpl>(device, ptr_mode)) {}
+  HandlePool(int device = 0) : handles_ptr_(std::make_shared<internal::HandlePoolImpl>(device)) {}
 
-  cublasHandle_t getNextHandle(cudaStream_t stream) {
+  cusolverDnHandle_t getNextHandle(cudaStream_t stream) {
     DLAF_ASSERT(bool(handles_ptr_), "");
     return handles_ptr_->getNextHandle(stream);
   }
