@@ -11,12 +11,7 @@
 
 #include "blas.hh"
 
-#include <functional>
-
-#include <hpx/execution_base/sender.hpp>
-
 #include "dlaf/common/callable_object.h"
-#include "dlaf/init.h"
 #include "dlaf/matrix/tile.h"
 #include "dlaf/types.h"
 #include "dlaf/util_blas.h"
@@ -193,5 +188,6 @@ DLAF_MAKE_CALLABLE_OBJECT(hemm);
 DLAF_MAKE_CALLABLE_OBJECT(her2k);
 DLAF_MAKE_CALLABLE_OBJECT(herk);
 DLAF_MAKE_CALLABLE_OBJECT(trsm);
+
 }
 }
