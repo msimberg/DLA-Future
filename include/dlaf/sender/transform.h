@@ -38,7 +38,7 @@ struct Transform<Backend::MC> {
   template <typename S, typename F>
   static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
     namespace ex = hpx::execution::experimental;
-    return ex::transform(ex::on(std::forward<S>(s), ex::with_priority(ex::executor{}, priority)),
+    return ex::transform(ex::on(std::forward<S>(s), ex::make_with_priority(ex::executor{}, priority)),
                          hpx::util::unwrapping(std::forward<F>(f)));
   }
 };
@@ -66,16 +66,16 @@ struct Transform<Backend::GPU> {
                     "last argument or a cublasHandle_t/cusolverDnHandle_t as the first argument");
 
       if constexpr (std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t>) {
-        (void)cublas_handle;
-        (void)cusolver_handle;
+        (void) cublas_handle;
+        (void) cusolver_handle;
         return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), ts..., stream);
       }
       else if constexpr (std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...>) {
-        (void)cusolver_handle;
+        (void) cusolver_handle;
         return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), cublas_handle, ts...);
       }
       else if constexpr (std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us...>) {
-        (void)cublas_handle;
+        (void) cublas_handle;
         return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), cusolver_handle, ts...);
       }
     }
@@ -133,27 +133,29 @@ struct Transform<Backend::GPU> {
           if constexpr (std::is_void_v<decltype(
                             call_helper(stream, cublas_handle, cusolver_handle, std::move(f), ts...))>) {
             call_helper(stream, cublas_handle, cusolver_handle, std::move(f), ts...);
-            hpx::future<void> fut = hpx::cuda::experimental::detail::get_future_with_event(stream);
-            fut.then(hpx::launch::sync,
-                     [r = std::move(r),
-                      keep_alive = std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
-                                                   std::move(cublas_handle_pool),
-                                                   std::move(cusolver_handle_pool))](
-                         hpx::future<void>&&) mutable {
-                       hpx::execution::experimental::set_value(std::move(r));
-                     });
+            hpx::cuda::experimental::detail::add_event_callback(
+                [r = std::move(r),
+                 keep_alive =
+                     std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
+                                     std::move(cublas_handle_pool),
+                                     std::move(cusolver_handle_pool))](cudaError_t status) mutable {
+                  DLAF_CUDA_CALL(status);
+                  hpx::execution::experimental::set_value(std::move(r));
+                },
+                stream);
           }
           else {
             auto res = call_helper(stream, cublas_handle, cusolver_handle, std::move(f), ts...);
-            hpx::future<void> fut = hpx::cuda::experimental::detail::get_future_with_event(stream);
-            fut.then(hpx::launch::sync,
-                     [r = std::move(r), res = std::move(res),
-                      keep_alive = std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
-                                                   std::move(cublas_handle_pool),
-                                                   std::move(cusolver_handle_pool))](
-                         hpx::future<void>&&) mutable {
-                       hpx::execution::experimental::set_value(std::move(r), std::move(res));
-                     });
+            hpx::cuda::experimental::detail::add_event_callback(
+                [r = std::move(r), res = std::move(res),
+                 keep_alive =
+                     std::make_tuple(std::forward<Ts>(ts)..., std::move(stream_pool),
+                                     std::move(cublas_handle_pool),
+                                     std::move(cusolver_handle_pool))](cudaError_t status) mutable {
+                  DLAF_CUDA_CALL(status);
+                  hpx::execution::experimental::set_value(std::move(r), std::move(res));
+                },
+                stream);
           }
         }
         catch (...) {
