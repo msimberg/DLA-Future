@@ -26,7 +26,6 @@
 #include "dlaf/lapack/tile.h"
 #include "dlaf/matrix/distribution.h"
 #include "dlaf/matrix/matrix.h"
-#include "dlaf/sender/transform.h"
 #include "dlaf/sender/when_all_lift.h"
 #include "dlaf/solver/triangular/api.h"
 #include "dlaf/util_matrix.h"
@@ -34,10 +33,26 @@
 namespace dlaf {
 namespace solver {
 namespace internal {
+template <Backend backend, typename T, typename InSender, typename OutSender>
+void trsmBPanelTile(blas::Side side, blas::Uplo uplo, blas::Op op, blas::Diag diag, T alpha,
+                    InSender&& in_tile, OutSender&& out_tile) {
+  dlaf::internal::whenAllLift(side, uplo, op, diag, alpha, std::forward<InSender>(in_tile),
+                              std::forward<OutSender>(out_tile)) |
+      tile::trsm(dlaf::internal::Policy<backend>(hpx::threads::thread_priority::high)) |
+      hpx::execution::experimental::detach();
+}
+
+template <Backend backend, typename T, typename ASender, typename BSender, typename CSender>
+void gemmTrailingMatrixTile(hpx::threads::thread_priority priority, blas::Op op_a, blas::Op op_b, T beta,
+                            ASender&& a_tile, BSender&& b_tile, CSender&& c_tile) {
+  dlaf::internal::whenAllLift(op_a, op_b, beta, std::forward<ASender>(a_tile),
+                              std::forward<BSender>(b_tile), T(1.0), std::forward<CSender>(c_tile)) |
+      tile::gemm(dlaf::internal::Policy<backend>(priority)) | hpx::execution::experimental::detach();
+}
+
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<const T, device>& mat_a,
                                               Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Left = blas::Side::Left;
@@ -52,9 +67,8 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
       auto kj = LocalTileIndex{k, j};
 
       // Triangular solve of k-th row Panel of B
-      dlaf::internal::whenAllLift(Left, Lower, blas::Op::NoTrans, diag, alpha,
-                                  mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Left, Lower, blas::Op::NoTrans, diag, alpha,
+                              mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj));
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
@@ -62,10 +76,9 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(blas::Op::NoTrans, blas::Op::NoTrans, beta,
-                                    mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj),
-                                    T(1.0), mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, blas::Op::NoTrans, blas::Op::NoTrans, beta,
+                                        mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -74,7 +87,6 @@ void Triangular<backend, device, T>::call_LLN(blas::Diag diag, T alpha, Matrix<c
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Left = blas::Side::Left;
@@ -88,9 +100,8 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
     for (SizeType j = n - 1; j > -1; --j) {
       auto kj = LocalTileIndex{k, j};
       // Triangular solve of k-th row Panel of B
-      dlaf::internal::whenAllLift(Left, Lower, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
-                                  mat_b.readwrite_sender(kj)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high));
+      trsmBPanelTile<backend>(Left, Lower, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                              mat_b.readwrite_sender(kj));
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
@@ -99,10 +110,9 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
         auto beta = static_cast<T>(-1.0) / alpha;
 
         // Update trailing matrix
-        dlaf::internal::whenAllLift(op, blas::Op::NoTrans, beta, mat_a.read_sender(LocalTileIndex{k, i}),
-                                    mat_b.read_sender(kj), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, op, blas::Op::NoTrans, beta,
+                                        mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -111,7 +121,6 @@ void Triangular<backend, device, T>::call_LLT(blas::Op op, blas::Diag diag, T al
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<const T, device>& mat_a,
                                               Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Left = blas::Side::Left;
@@ -125,9 +134,8 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
     for (SizeType j = n - 1; j > -1; --j) {
       auto kj = LocalTileIndex{k, j};
       // Triangular solve of k-th row Panel of B
-      dlaf::internal::whenAllLift(Left, Upper, NoTrans, diag, alpha,
-                                  mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(kj)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Left, Upper, NoTrans, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                              mat_b.readwrite_sender(kj));
 
       for (SizeType i = k - 1; i > -1; --i) {
         // Choose queue priority
@@ -135,10 +143,9 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(NoTrans, NoTrans, beta, mat_a.read_sender(LocalTileIndex{i, k}),
-                                    mat_b.read_sender(kj), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority));
+        gemmTrailingMatrixTile<backend>(priority, NoTrans, NoTrans, beta,
+                                        mat_a.read_sender(LocalTileIndex{i, k}), mat_b.read_sender(kj),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -147,7 +154,6 @@ void Triangular<backend, device, T>::call_LUN(blas::Diag diag, T alpha, Matrix<c
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Left = blas::Side::Left;
@@ -162,9 +168,8 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
       auto kj = LocalTileIndex{k, j};
 
       // Triangular solve of k-th row Panel of B
-      dlaf::internal::whenAllLift(Left, Upper, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
-                                  mat_b.readwrite_sender(kj)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Left, Upper, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                              mat_b.readwrite_sender(kj));
 
       for (SizeType i = k + 1; i < m; ++i) {
         // Choose queue priority
@@ -172,10 +177,9 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(op, NoTrans, beta, mat_a.read_sender(LocalTileIndex{k, i}),
-                                    mat_b.read_sender(kj), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, op, NoTrans, beta,
+                                        mat_a.read_sender(LocalTileIndex{k, i}), mat_b.read_sender(kj),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -184,7 +188,6 @@ void Triangular<backend, device, T>::call_LUT(blas::Op op, blas::Diag diag, T al
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<const T, device>& mat_a,
                                               Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Right = blas::Side::Right;
@@ -199,9 +202,8 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      dlaf::internal::whenAllLift(Right, Lower, NoTrans, diag, alpha,
-                                  mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Right, Lower, NoTrans, diag, alpha,
+                              mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
@@ -209,10 +211,9 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(NoTrans, NoTrans, beta, mat_b.read_sender(ik),
-                                    mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
+                                        mat_a.read_sender(LocalTileIndex{k, j}),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -221,7 +222,6 @@ void Triangular<backend, device, T>::call_RLN(blas::Diag diag, T alpha, Matrix<c
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Right = blas::Side::Right;
@@ -236,9 +236,8 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      dlaf::internal::whenAllLift(Right, Lower, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
-                                  mat_b.readwrite_sender(ik)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Right, Lower, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                              mat_b.readwrite_sender(ik));
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
@@ -246,10 +245,9 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(NoTrans, op, beta, mat_b.read_sender(ik),
-                                    mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, NoTrans, op, beta, mat_b.read_sender(ik),
+                                        mat_a.read_sender(LocalTileIndex{j, k}),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -258,7 +256,6 @@ void Triangular<backend, device, T>::call_RLT(blas::Op op, blas::Diag diag, T al
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<const T, device>& mat_a,
                                               Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Right = blas::Side::Right;
@@ -273,9 +270,8 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      dlaf::internal::whenAllLift(Right, Upper, NoTrans, diag, alpha,
-                                  mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Right, Upper, NoTrans, diag, alpha,
+                              mat_a.read_sender(LocalTileIndex{k, k}), mat_b.readwrite_sender(ik));
 
       for (SizeType j = k + 1; j < n; ++j) {
         // Choose queue priority
@@ -283,10 +279,9 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(NoTrans, NoTrans, beta, mat_b.read_sender(ik),
-                                    mat_a.read_sender(LocalTileIndex{k, j}), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, NoTrans, NoTrans, beta, mat_b.read_sender(ik),
+                                        mat_a.read_sender(LocalTileIndex{k, j}),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -295,7 +290,6 @@ void Triangular<backend, device, T>::call_RUN(blas::Diag diag, T alpha, Matrix<c
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::threads::thread_priority;
 
   constexpr auto Right = blas::Side::Right;
@@ -310,9 +304,8 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
       auto ik = LocalTileIndex{i, k};
 
       // Triangular solve of k-th col Panel of B
-      dlaf::internal::whenAllLift(Right, Upper, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
-                                  mat_b.readwrite_sender(ik)) |
-          tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+      trsmBPanelTile<backend>(Right, Upper, op, diag, alpha, mat_a.read_sender(LocalTileIndex{k, k}),
+                              mat_b.readwrite_sender(ik));
 
       for (SizeType j = k - 1; j > -1; --j) {
         // Choose queue priority
@@ -320,10 +313,9 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
 
         auto beta = static_cast<T>(-1.0) / alpha;
         // Update trailing matrix
-        dlaf::internal::whenAllLift(NoTrans, op, beta, mat_b.read_sender(ik),
-                                    mat_a.read_sender(LocalTileIndex{j, k}), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i, j})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, NoTrans, op, beta, mat_b.read_sender(ik),
+                                        mat_a.read_sender(LocalTileIndex{j, k}),
+                                        mat_b.readwrite_sender(LocalTileIndex{i, j}));
       }
     }
   }
@@ -332,10 +324,8 @@ void Triangular<backend, device, T>::call_RUT(blas::Op op, blas::Diag diag, T al
 template <Backend backend, Device device, class T>
 void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas::Diag diag, T alpha,
                                               Matrix<const T, device>& mat_a, Matrix<T, device>& mat_b) {
-  using hpx::execution::experimental::detach;
   using hpx::execution::experimental::keep_future;
   using hpx::threads::thread_priority;
-  using hpx::unwrapping;
 
   constexpr auto Left = blas::Side::Left;
   constexpr auto Lower = blas::Uplo::Lower;
@@ -389,9 +379,8 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
       if (mat_b.rankIndex().row() == k_rank_row) {
         auto k_local_row = distr_b.localTileFromGlobalTile<Coord::Row>(k);
         auto kj = LocalTileIndex{k_local_row, j_local};
-        dlaf::internal::whenAllLift(Left, Lower, blas::Op::NoTrans, diag, alpha, keep_future(kk_tile),
-                                    mat_b.readwrite_sender(kj)) |
-            tile::trsm(dlaf::internal::Policy<backend>(thread_priority::high)) | detach();
+        trsmBPanelTile<backend>(Left, Lower, blas::Op::NoTrans, diag, alpha, keep_future(kk_tile),
+                                mat_b.readwrite_sender(kj));
 
         panel[j_local] = mat_b.read(kj);
         if (k != (mat_b.nrTiles().rows() - 1)) {
@@ -432,10 +421,9 @@ void Triangular<backend, device, T>::call_LLN(comm::CommunicatorGrid grid, blas:
       // Update trailing matrix
       for (SizeType j_local = 0; j_local < b_local_cols; ++j_local) {
         T beta = T(-1.0) / alpha;
-        dlaf::internal::whenAllLift(blas::Op::NoTrans, blas::Op::NoTrans, beta, keep_future(ik_tile),
-                                    keep_future(panel[j_local]), T(1.0),
-                                    mat_b.readwrite_sender(LocalTileIndex{i_local, j_local})) |
-            tile::gemm(dlaf::internal::Policy<backend>(priority)) | detach();
+        gemmTrailingMatrixTile<backend>(priority, blas::Op::NoTrans, blas::Op::NoTrans, beta,
+                                        keep_future(ik_tile), keep_future(panel[j_local]),
+                                        mat_b.readwrite_sender(LocalTileIndex{i_local, j_local}));
       }
     }
   }
