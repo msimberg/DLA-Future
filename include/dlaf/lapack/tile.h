@@ -29,6 +29,9 @@
 #include "dlaf/common/callable_object.h"
 #include "dlaf/matrix/index.h"
 #include "dlaf/matrix/tile.h"
+#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/policy.h"
+#include "dlaf/sender/transform.h"
 #include "dlaf/types.h"
 #include "dlaf/util_tile.h"
 
@@ -267,6 +270,30 @@ void potrf(cusolverDnHandle_t handle, const blas::Uplo uplo, const matrix::Tile<
 DLAF_MAKE_CALLABLE_OBJECT(hegst);
 DLAF_MAKE_CALLABLE_OBJECT(potrf);
 DLAF_MAKE_CALLABLE_OBJECT(potrfInfo);
+
+// TODO: Duplicated from dlaf/blas/tile.h. Put in a common location.
+#define DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(fname)                                        \
+  template <Backend B, typename Sender,                                                         \
+            typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>     \
+  auto fname(const dlaf::internal::Policy<B> p, Sender&& s) {                                   \
+    return dlaf::internal::transform<B>(p.priority(), fname##_o, std::forward<Sender>(s));      \
+  }                                                                                             \
+                                                                                                \
+  template <Backend B>                                                                          \
+  auto fname(const dlaf::internal::Policy<B> p) {                                               \
+    return dlaf::internal::PartialAlgorithm{p, fname##_o};                                      \
+  }                                                                                             \
+                                                                                                \
+  template <Backend B, typename T1, typename T2, typename... Ts>                                \
+  void fname(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {                 \
+    hpx::execution::experimental::sync_wait(                                                    \
+        fname(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2), \
+                                                    std::forward<Ts>(ts)...)));                 \
+  }
+
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(potrf)
+
+#undef DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS
 
 }
 }

@@ -197,7 +197,7 @@ DLAF_MAKE_CALLABLE_OBJECT(trsm);
   template <Backend B, typename Sender,                                                         \
             typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>     \
   auto fname(const dlaf::internal::Policy<B> p, Sender&& s) {                                   \
-    return dlaf::transform<B>(p.priority(), fname##_o, std::forward<Sender>(s));                \
+    return dlaf::internal::transform<B>(p.priority(), fname##_o, std::forward<Sender>(s));      \
   }                                                                                             \
                                                                                                 \
   template <Backend B>                                                                          \
@@ -212,11 +212,11 @@ DLAF_MAKE_CALLABLE_OBJECT(trsm);
                                                     std::forward<Ts>(ts)...)));                 \
   }
 
-DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(gemm);
-DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(hemm);
-DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(her2k);
-DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(herk);
-DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm);
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(gemm)
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(hemm)
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(her2k)
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(herk)
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm)
 
 #undef DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS
 
@@ -228,7 +228,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm);
 // template <Backend B, typename Sender,
 //           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 // auto trsm(const dlaf::internal::Policy<B> p, Sender&& s) {
-//   return dlaf::transform<B>(p.priority(), trsm_o, std::forward<Sender>(s));
+//   return dlaf::internal::transform<B>(p.priority(), trsm_o, std::forward<Sender>(s));
 // }
 
 // /// Performs a triangular solve. This overload partially applies the algorithm
@@ -255,7 +255,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm);
 // template <Backend B, typename Sender,
 //           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 // auto gemm(const dlaf::internal::Policy<B> p, Sender&& s) {
-//   return dlaf::transform<B>(p.priority(), gemm_o, std::forward<Sender>(s));
+//   return dlaf::internal::transform<B>(p.priority(), gemm_o, std::forward<Sender>(s));
 // }
 
 // /// Computes general matrix matrix multiplication. This overload partially

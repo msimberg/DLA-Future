@@ -167,7 +167,7 @@ DLAF_MAKE_CALLABLE_OBJECT(copy);
 template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto copy(const dlaf::internal::Policy<B> p, Sender&& s) {
-  return dlaf::transform<B>(p.priority(), copy_o, std::forward<Sender>(s));
+  return dlaf::internal::transform<B>(p.priority(), copy_o, std::forward<Sender>(s));
 }
 
 // copy overload taking a policy, returning a partially applied algorithm. This
@@ -216,7 +216,7 @@ auto duplicateIfNeeded(hpx::future<Tile<T, Source>> tile) {
   }
   else {
     return hpx::execution::experimental::make_future(
-        dlaf::transform<
+        dlaf::internal::transform<
             internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
                                                                dlaf::matrix::Duplicate<Destination>{},
                                                                std::move(tile)));
@@ -230,7 +230,7 @@ auto duplicateIfNeeded(hpx::shared_future<Tile<T, Source>> tile) {
   }
   else {
     return hpx::execution::experimental::make_future(
-        dlaf::transform<
+        dlaf::internal::transform<
             internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
                                                                dlaf::matrix::Duplicate<Destination>{},
                                                                hpx::execution::experimental::keep_future(

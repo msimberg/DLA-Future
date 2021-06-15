@@ -12,6 +12,7 @@
 #include <hpx/local/execution.hpp>
 
 #include "dlaf/init.h"
+#include "dlaf/sender/policy.h"
 #include "dlaf/sender/when_all_lift.h"
 #include "dlaf/types.h"
 
@@ -36,9 +37,10 @@ struct Transform;
 template <>
 struct Transform<Backend::MC> {
   template <typename S, typename F>
-  static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
+  static auto call(const Policy<Backend::MC> policy, S&& s, F&& f) {
     namespace ex = hpx::execution::experimental;
-    return ex::transform(ex::on(std::forward<S>(s), ex::with_priority(ex::executor{}, priority)),
+    return ex::transform(ex::on(std::forward<S>(s),
+                                ex::with_priority(ex::executor{}, policy.priority())),
                          hpx::util::unwrapping(std::forward<F>(f)));
   }
 };
@@ -176,8 +178,8 @@ struct Transform<Backend::GPU> {
   };
 
   template <typename S, typename F>
-  static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
-    return GPUTransformSender<S, F>{priority >= hpx::threads::thread_priority::high
+  static auto call(const Policy<Backend::GPU> policy, S&& s, F&& f) {
+    return GPUTransformSender<S, F>{policy.priority() >= hpx::threads::thread_priority::high
                                         ? getHpCudaStreamPool()
                                         : getNpCudaStreamPool(),
                                     getCublasHandlePool(), getCusolverHandlePool(), std::forward<S>(s),
@@ -185,25 +187,25 @@ struct Transform<Backend::GPU> {
   }
 };
 #endif
-}
 
 // Lazy transform. This does not submit the work and returns a sender.
 template <Backend B, typename F, typename Sender>
-[[nodiscard]] decltype(auto) transform(hpx::threads::thread_priority priority, F&& f, Sender&& sender) {
-  return internal::Transform<B>::call(priority, std::forward<Sender>(sender), std::forward<F>(f));
+[[nodiscard]] decltype(auto) transform(const Policy<B> policy, F&& f, Sender&& sender) {
+  return internal::Transform<B>::call(policy, std::forward<Sender>(sender), std::forward<F>(f));
 }
 
 // Lazy transform. This does not submit the work and returns a sender.
 template <Backend B, typename F, typename... Ts>
-[[nodiscard]] decltype(auto) transformLift(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
-  return internal::Transform<B>::call(priority, internal::whenAllLift(std::forward<Ts>(ts)...),
+[[nodiscard]] decltype(auto) transformLift(const Policy<B> policy, F&& f, Ts&&... ts) {
+  return internal::Transform<B>::call(policy, internal::whenAllLift(std::forward<Ts>(ts)...),
                                       std::forward<F>(f));
 }
 
 // Fire-and-forget transform. This submits the work and returns void.
 template <Backend B, typename F, typename... Ts>
-void transformLiftDetach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+void transformLiftDetach(const Policy<B> policy, F&& f, Ts&&... ts) {
   hpx::execution::experimental::detach(
-      transformLift<B>(priority, std::forward<F>(f), std::forward<Ts>(ts)...));
+      transformLift<B>(policy, std::forward<F>(f), std::forward<Ts>(ts)...));
+}
 }
 }

@@ -34,7 +34,7 @@ public:
 
   template <typename Sender>
   friend auto operator|(Sender&& sender, const PartialAlgorithm pa) {
-    return transform<B>(pa.policy_.priority(), std::move(pa.f_), std::forward<Sender>(sender));
+    return transform<B>(pa.policy_, std::move(pa.f_), std::forward<Sender>(sender));
   }
 };
 
