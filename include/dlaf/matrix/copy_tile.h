@@ -22,6 +22,8 @@
 #include "dlaf/executors.h"
 #include "dlaf/lapack/tile.h"
 #include "dlaf/matrix/tile.h"
+#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/policy.h"
 #include "dlaf/sender/transform.h"
 
 namespace dlaf {
@@ -159,6 +161,28 @@ void copy(TileElementSize region, TileElementIndex in_idx, const Tile<const T, D
 }
 
 DLAF_MAKE_CALLABLE_OBJECT(copy);
+
+// copy overload taking a policy and a sender, returning a sender. This can be
+// used in task graphs.
+template <Backend B, typename Sender,
+          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
+auto copy(const dlaf::internal::Policy<B> p, Sender&& s) {
+  return dlaf::transform<B>(p.priority(), copy_o, std::forward<Sender>(s));
+}
+
+// copy overload taking a policy, returning a partially applied algorithm. This
+// can be used in task graphs with the | operator.
+template <Backend B>
+auto copy(const dlaf::internal::Policy<B> p) {
+  return dlaf::internal::PartialAlgorithm<B, decltype(copy_o)>{p, copy_o};
+}
+
+// copy overload taking a policy and plain arguments. This is a blocking call.
+template <Backend B, typename T1, typename T2>
+void copy(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2) {
+  hpx::execution::experimental::sync_wait(
+      copy(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2))));
+}
 
 /// Helper struct for copying a given tile to an identical tile on Destination.
 ///

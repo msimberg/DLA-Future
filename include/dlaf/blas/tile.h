@@ -13,6 +13,9 @@
 
 #include "dlaf/common/callable_object.h"
 #include "dlaf/matrix/tile.h"
+#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/policy.h"
+#include "dlaf/sender/transform.h"
 #include "dlaf/types.h"
 #include "dlaf/util_blas.h"
 
@@ -188,6 +191,56 @@ DLAF_MAKE_CALLABLE_OBJECT(hemm);
 DLAF_MAKE_CALLABLE_OBJECT(her2k);
 DLAF_MAKE_CALLABLE_OBJECT(herk);
 DLAF_MAKE_CALLABLE_OBJECT(trsm);
+
+// Overloads with policies. They take a dlaf::internal::Policy templated on a
+// backend which may hold additional properties related to the execution of the
+// algorithm.
+
+// trsm overload taking a policy and a sender, returning a sender. This can be
+// used in task graphs.
+template <Backend B, typename Sender,
+          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
+auto trsm(const dlaf::internal::Policy<B> p, Sender&& s) {
+  return dlaf::transform<B>(p.priority(), trsm_o, std::forward<Sender>(s));
+}
+
+// trsm overload taking a policy, returning a partially applied algorithm. This
+// can be used in task graphs with the | operator.
+template <Backend B>
+auto trsm(const dlaf::internal::Policy<B> p) {
+  return dlaf::internal::PartialAlgorithm<B, decltype(trsm_o)>{p, trsm_o};
+}
+
+// trsm overload taking a policy and plain arguments. This is a blocking call.
+template <Backend B, typename T1, typename T2, typename... Ts>
+void trsm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
+  hpx::execution::experimental::sync_wait(
+      trsm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
+                                                 std::forward<Ts>(ts)...)));
+}
+
+// gemm overload taking a policy and a sender, returning a sender. This can be
+// used in task graphs.
+template <Backend B, typename Sender,
+          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
+auto gemm(const dlaf::internal::Policy<B> p, Sender&& s) {
+  return dlaf::transform<B>(p.priority(), gemm_o, std::forward<Sender>(s));
+}
+
+// gemm overload taking a policy, returning a partially applied algorithm. This
+// can be used in task graphs with the | operator.
+template <Backend B>
+auto gemm(const dlaf::internal::Policy<B> p) {
+  return dlaf::internal::PartialAlgorithm<B, decltype(gemm_o)>{p, gemm_o};
+}
+
+// gemm overload taking a policy and plain arguments. This is a blocking call.
+template <Backend B, typename T1, typename T2, typename... Ts>
+void gemm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
+  hpx::execution::experimental::sync_wait(
+      gemm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
+                                                 std::forward<Ts>(ts)...)));
+}
 
 }
 }

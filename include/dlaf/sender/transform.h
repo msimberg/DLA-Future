@@ -38,7 +38,7 @@ struct Transform<Backend::MC> {
   template <typename S, typename F>
   static auto call(hpx::threads::thread_priority priority, S&& s, F&& f) {
     namespace ex = hpx::execution::experimental;
-    return ex::transform(ex::on(std::forward<S>(s), ex::make_with_priority(ex::executor{}, priority)),
+    return ex::transform(ex::on(std::forward<S>(s), ex::with_priority(ex::executor{}, priority)),
                          hpx::util::unwrapping(std::forward<F>(f)));
   }
 };
@@ -113,7 +113,7 @@ struct Transform<Backend::GPU> {
       std::decay_t<F> f;
 
       template <typename E>
-          void set_error(E&& e) && noexcept {
+      void set_error(E&& e) && noexcept {
         hpx::execution::experimental::set_error(std::move(r), std::forward<E>(e));
       }
 
@@ -188,16 +188,22 @@ struct Transform<Backend::GPU> {
 }
 
 // Lazy transform. This does not submit the work and returns a sender.
+template <Backend B, typename F, typename Sender>
+[[nodiscard]] decltype(auto) transform(hpx::threads::thread_priority priority, F&& f, Sender&& sender) {
+  return internal::Transform<B>::call(priority, std::forward<Sender>(sender), std::forward<F>(f));
+}
+
+// Lazy transform. This does not submit the work and returns a sender.
 template <Backend B, typename F, typename... Ts>
-[[nodiscard]] decltype(auto) transform(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+[[nodiscard]] decltype(auto) transformLift(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
   return internal::Transform<B>::call(priority, internal::whenAllLift(std::forward<Ts>(ts)...),
                                       std::forward<F>(f));
 }
 
 // Fire-and-forget transform. This submits the work and returns void.
 template <Backend B, typename F, typename... Ts>
-void transformDetach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
+void transformLiftDetach(hpx::threads::thread_priority priority, F&& f, Ts&&... ts) {
   hpx::execution::experimental::detach(
-      transform<B>(priority, std::forward<F>(f), std::forward<Ts>(ts)...));
+      transformLift<B>(priority, std::forward<F>(f), std::forward<Ts>(ts)...));
 }
 }

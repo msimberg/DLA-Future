@@ -38,25 +38,25 @@ namespace internal {
 namespace cholesky_l {
 template <Backend backend, Device device, class T>
 void potrfDiagTile(hpx::future<matrix::Tile<T, device>> matrix_tile) {
-  transformDetach<backend>(hpx::threads::thread_priority::normal, tile::potrf_o, blas::Uplo::Lower,
-                           std::move(matrix_tile));
+  transformLiftDetach<backend>(hpx::threads::thread_priority::normal, tile::potrf_o, blas::Uplo::Lower,
+                               std::move(matrix_tile));
 }
 
 template <Backend backend, typename KKTileSender, template <typename> typename MatrixTileSender,
           Device device, class T>
 void trsmPanelTile(KKTileSender kk_tile, MatrixTileSender<matrix::Tile<T, device>> matrix_tile) {
-  transformDetach<backend>(hpx::threads::thread_priority::high, tile::trsm_o, blas::Side::Right,
-                           blas::Uplo::Lower, blas::Op::ConjTrans, blas::Diag::NonUnit, T(1.0),
-                           std::move(kk_tile), std::move(matrix_tile));
+  transformLiftDetach<backend>(hpx::threads::thread_priority::high, tile::trsm_o, blas::Side::Right,
+                               blas::Uplo::Lower, blas::Op::ConjTrans, blas::Diag::NonUnit, T(1.0),
+                               std::move(kk_tile), std::move(matrix_tile));
 }
 
 template <Backend backend, typename PanelTileSender, template <typename> typename MatrixTileSender,
           Device device, class T>
 void herkTrailingDiagTile(hpx::threads::thread_priority priority, PanelTileSender panel_tile,
                           MatrixTileSender<matrix::Tile<T, device>> matrix_tile) {
-  transformDetach<backend>(priority, tile::herk_o, blas::Uplo::Lower, blas::Op::NoTrans,
-                           BaseType<T>(-1.0), std::move(panel_tile), BaseType<T>(1.0),
-                           std::move(matrix_tile));
+  transformLiftDetach<backend>(priority, tile::herk_o, blas::Uplo::Lower, blas::Op::NoTrans,
+                               BaseType<T>(-1.0), std::move(panel_tile), BaseType<T>(1.0),
+                               std::move(matrix_tile));
 }
 
 template <Backend backend, typename PanelColTileSender, template <typename> typename MatrixTileSender,
@@ -64,8 +64,9 @@ template <Backend backend, typename PanelColTileSender, template <typename> type
 void gemmTrailingMatrixTile(hpx::threads::thread_priority priority, PanelColTileSender panel_tile,
                             PanelColTileSender col_panel,
                             MatrixTileSender<matrix::Tile<T, device>> matrix_tile) {
-  transformDetach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::ConjTrans, T(-1.0),
-                           std::move(panel_tile), std::move(col_panel), T(1.0), std::move(matrix_tile));
+  transformLiftDetach<backend>(priority, tile::gemm_o, blas::Op::NoTrans, blas::Op::ConjTrans, T(-1.0),
+                               std::move(panel_tile), std::move(col_panel), T(1.0),
+                               std::move(matrix_tile));
 }
 }
 
