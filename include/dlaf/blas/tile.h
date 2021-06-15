@@ -202,7 +202,7 @@ DLAF_MAKE_CALLABLE_OBJECT(trsm);
                                                                                                 \
   template <Backend B>                                                                          \
   auto fname(const dlaf::internal::Policy<B> p) {                                               \
-    return dlaf::internal::PartialAlgorithm<B, decltype(fname##_o)>{p, fname##_o};              \
+    return dlaf::internal::PartialAlgorithm{p, fname##_o};                                      \
   }                                                                                             \
                                                                                                 \
   template <Backend B, typename T1, typename T2, typename... Ts>                                \
