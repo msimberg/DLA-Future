@@ -29,7 +29,7 @@
 #include "dlaf/common/callable_object.h"
 #include "dlaf/matrix/index.h"
 #include "dlaf/matrix/tile.h"
-#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/partial_transform.h"
 #include "dlaf/sender/policy.h"
 #include "dlaf/sender/transform.h"
 #include "dlaf/types.h"

@@ -22,7 +22,7 @@
 #include "dlaf/executors.h"
 #include "dlaf/lapack/tile.h"
 #include "dlaf/matrix/tile.h"
-#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/partial_transform.h"
 #include "dlaf/sender/policy.h"
 #include "dlaf/sender/transform.h"
 
@@ -167,14 +167,14 @@ DLAF_MAKE_CALLABLE_OBJECT(copy);
 template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto copy(const dlaf::internal::Policy<B> p, Sender&& s) {
-  return dlaf::internal::transform<B>(p.priority(), copy_o, std::forward<Sender>(s));
+  return dlaf::internal::transform<B>(p, copy_o, std::forward<Sender>(s));
 }
 
 // copy overload taking a policy, returning a partially applied algorithm. This
 // can be used in task graphs with the | operator.
 template <Backend B>
 auto copy(const dlaf::internal::Policy<B> p) {
-  return dlaf::internal::PartialTransform<B, decltype(copy_o)>{p, copy_o};
+  return dlaf::internal::PartialTransform{p, copy_o};
 }
 
 // copy overload taking a policy and plain arguments. This is a blocking call.

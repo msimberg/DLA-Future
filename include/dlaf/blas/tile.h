@@ -13,7 +13,7 @@
 
 #include "dlaf/common/callable_object.h"
 #include "dlaf/matrix/tile.h"
-#include "dlaf/sender/partial_algorithm.h"
+#include "dlaf/sender/partial_transform.h"
 #include "dlaf/sender/policy.h"
 #include "dlaf/sender/transform.h"
 #include "dlaf/types.h"
@@ -236,7 +236,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm)
 // /// side.
 // template <Backend B>
 // auto trsm(const dlaf::internal::Policy<B> p) {
-//   return dlaf::internal::PartialTransform<B, decltype(trsm_o)>{p, trsm_o};
+//   return dlaf::internal::PartialTransform{p, trsm_o};
 // }
 
 // /// Performs a triangular solve. This overload takes a policy argument and
@@ -263,7 +263,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm)
 // /// sender on the left-hand side.
 // template <Backend B>
 // auto gemm(const dlaf::internal::Policy<B> p) {
-//   return dlaf::internal::PartialTransform<B, decltype(gemm_o)>{p, gemm_o};
+//   return dlaf::internal::PartialTransform{p, gemm_o};
 // }
 
 // /// Computes general matrix matrix multiplication.This overload takes a policy
