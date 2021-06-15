@@ -192,55 +192,88 @@ DLAF_MAKE_CALLABLE_OBJECT(her2k);
 DLAF_MAKE_CALLABLE_OBJECT(herk);
 DLAF_MAKE_CALLABLE_OBJECT(trsm);
 
-// Overloads with policies. They take a dlaf::internal::Policy templated on a
-// backend which may hold additional properties related to the execution of the
-// algorithm.
+// TODO: Generate? How about docs? Link docs to main overload? #ifdef DOXYGEN for docs?
+#define DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(fname)                                        \
+  template <Backend B, typename Sender,                                                         \
+            typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>     \
+  auto fname(const dlaf::internal::Policy<B> p, Sender&& s) {                                   \
+    return dlaf::transform<B>(p.priority(), fname##_o, std::forward<Sender>(s));                \
+  }                                                                                             \
+                                                                                                \
+  template <Backend B>                                                                          \
+  auto fname(const dlaf::internal::Policy<B> p) {                                               \
+    return dlaf::internal::PartialAlgorithm<B, decltype(fname##_o)>{p, fname##_o};              \
+  }                                                                                             \
+                                                                                                \
+  template <Backend B, typename T1, typename T2, typename... Ts>                                \
+  void fname(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {                 \
+    hpx::execution::experimental::sync_wait(                                                    \
+        fname(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2), \
+                                                    std::forward<Ts>(ts)...)));                 \
+  }
 
-// trsm overload taking a policy and a sender, returning a sender. This can be
-// used in task graphs.
-template <Backend B, typename Sender,
-          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
-auto trsm(const dlaf::internal::Policy<B> p, Sender&& s) {
-  return dlaf::transform<B>(p.priority(), trsm_o, std::forward<Sender>(s));
-}
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(gemm);
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(hemm);
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(her2k);
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(herk);
+DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm);
 
-// trsm overload taking a policy, returning a partially applied algorithm. This
-// can be used in task graphs with the | operator.
-template <Backend B>
-auto trsm(const dlaf::internal::Policy<B> p) {
-  return dlaf::internal::PartialAlgorithm<B, decltype(trsm_o)>{p, trsm_o};
-}
+#undef DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS
 
-// trsm overload taking a policy and plain arguments. This is a blocking call.
-template <Backend B, typename T1, typename T2, typename... Ts>
-void trsm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
-  hpx::execution::experimental::sync_wait(
-      trsm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
-                                                 std::forward<Ts>(ts)...)));
-}
+// TODO: What to do about the docs here?
+// /// Performs a triangular solve. This overload takes a policy argument and a
+// /// sender which must send all required arguments for a triangular solve. TODO:
+// /// link to non-sender docs? Returns a sender which signals a connected receiver
+// /// when the algorithm is done.
+// template <Backend B, typename Sender,
+//           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
+// auto trsm(const dlaf::internal::Policy<B> p, Sender&& s) {
+//   return dlaf::transform<B>(p.priority(), trsm_o, std::forward<Sender>(s));
+// }
 
-// gemm overload taking a policy and a sender, returning a sender. This can be
-// used in task graphs.
-template <Backend B, typename Sender,
-          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
-auto gemm(const dlaf::internal::Policy<B> p, Sender&& s) {
-  return dlaf::transform<B>(p.priority(), gemm_o, std::forward<Sender>(s));
-}
+// /// Performs a triangular solve. This overload partially applies the algorithm
+// /// with a policy for later use with operator| with a sender on the left-hand
+// /// side.
+// template <Backend B>
+// auto trsm(const dlaf::internal::Policy<B> p) {
+//   return dlaf::internal::PartialAlgorithm<B, decltype(trsm_o)>{p, trsm_o};
+// }
 
-// gemm overload taking a policy, returning a partially applied algorithm. This
-// can be used in task graphs with the | operator.
-template <Backend B>
-auto gemm(const dlaf::internal::Policy<B> p) {
-  return dlaf::internal::PartialAlgorithm<B, decltype(gemm_o)>{p, gemm_o};
-}
+// /// Performs a triangular solve. This overload takes a policy argument and
+// /// blocks until completion of the algorithm.
+// template <Backend B, typename T1, typename T2, typename... Ts>
+// void trsm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
+//   hpx::execution::experimental::sync_wait(
+//       trsm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
+//                                                  std::forward<Ts>(ts)...)));
+// }
 
-// gemm overload taking a policy and plain arguments. This is a blocking call.
-template <Backend B, typename T1, typename T2, typename... Ts>
-void gemm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
-  hpx::execution::experimental::sync_wait(
-      gemm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
-                                                 std::forward<Ts>(ts)...)));
-}
+// /// Computes general matrix matrix multiplication. This overload takes a policy
+// /// argument and a sender which must send all required arguments for a
+// /// triangular solve. TODO: link to non-sender docs? Returns a sender which
+// /// signals a connected receiver when the algorithm is done.
+// template <Backend B, typename Sender,
+//           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
+// auto gemm(const dlaf::internal::Policy<B> p, Sender&& s) {
+//   return dlaf::transform<B>(p.priority(), gemm_o, std::forward<Sender>(s));
+// }
+
+// /// Computes general matrix matrix multiplication. This overload partially
+// /// applies the algorithm with a policy for later use with operator| with a
+// /// sender on the left-hand side.
+// template <Backend B>
+// auto gemm(const dlaf::internal::Policy<B> p) {
+//   return dlaf::internal::PartialAlgorithm<B, decltype(gemm_o)>{p, gemm_o};
+// }
+
+// /// Computes general matrix matrix multiplication.This overload takes a policy
+// /// argument and blocks until completion of the algorithm.
+// template <Backend B, typename T1, typename T2, typename... Ts>
+// void gemm(const dlaf::internal::Policy<B> p, T1&& t1, T2&& t2, Ts&&... ts) {
+//   hpx::execution::experimental::sync_wait(
+//       gemm(p, hpx::execution::experimental::just(std::forward<T1>(t1), std::forward<T2>(t2),
+//                                                  std::forward<Ts>(ts)...)));
+// }
 
 }
 }
