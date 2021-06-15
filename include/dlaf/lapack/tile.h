@@ -281,7 +281,7 @@ DLAF_MAKE_CALLABLE_OBJECT(potrfInfo);
                                                                                                 \
   template <Backend B>                                                                          \
   auto fname(const dlaf::internal::Policy<B> p) {                                               \
-    return dlaf::internal::PartialAlgorithm{p, fname##_o};                                      \
+    return dlaf::internal::PartialTransform{p, fname##_o};                                      \
   }                                                                                             \
                                                                                                 \
   template <Backend B, typename T1, typename T2, typename... Ts>                                \

@@ -17,6 +17,9 @@
 namespace dlaf {
 namespace internal {
 // TODO: Use HPX properties?
+
+/// A policy class for use as a tag for dispatching algorithms to a particular
+/// backend.
 template <Backend B>
 class Policy {
 private:

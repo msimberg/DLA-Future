@@ -174,7 +174,7 @@ auto copy(const dlaf::internal::Policy<B> p, Sender&& s) {
 // can be used in task graphs with the | operator.
 template <Backend B>
 auto copy(const dlaf::internal::Policy<B> p) {
-  return dlaf::internal::PartialAlgorithm<B, decltype(copy_o)>{p, copy_o};
+  return dlaf::internal::PartialTransform<B, decltype(copy_o)>{p, copy_o};
 }
 
 // copy overload taking a policy and plain arguments. This is a blocking call.

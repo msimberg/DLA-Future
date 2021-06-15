@@ -19,26 +19,29 @@
 
 namespace dlaf {
 namespace internal {
+/// A partially applied transform, with the policy and callable object given,
+/// but the predecesor sender missing. The predecessor sender is applied when
+/// calling the operator| overload.
 template <Backend B, typename F>
-class PartialAlgorithm {
+class PartialTransform {
   const Policy<B> policy_;
   std::decay_t<F> f_;
 
 public:
   template <typename F_>
-  PartialAlgorithm(const Policy<B> policy, F_&& f) : policy_(policy), f_(std::forward<F_>(f)) {}
-  PartialAlgorithm(PartialAlgorithm&&) = default;
-  PartialAlgorithm(PartialAlgorithm const&) = default;
-  PartialAlgorithm& operator=(PartialAlgorithm&&) = default;
-  PartialAlgorithm& operator=(PartialAlgorithm const&) = default;
+  PartialTransform(const Policy<B> policy, F_&& f) : policy_(policy), f_(std::forward<F_>(f)) {}
+  PartialTransform(PartialTransform&&) = default;
+  PartialTransform(PartialTransform const&) = default;
+  PartialTransform& operator=(PartialTransform&&) = default;
+  PartialTransform& operator=(PartialTransform const&) = default;
 
   template <typename Sender>
-  friend auto operator|(Sender&& sender, const PartialAlgorithm pa) {
+  friend auto operator|(Sender&& sender, const PartialTransform pa) {
     return transform<B>(pa.policy_, std::move(pa.f_), std::forward<Sender>(sender));
   }
 };
 
 template <Backend B, typename F>
-PartialAlgorithm(const Policy<B> policy, F&& f) -> PartialAlgorithm<B, std::decay_t<F>>;
+PartialTransform(const Policy<B> policy, F&& f) -> PartialTransform<B, std::decay_t<F>>;
 }
 }

@@ -28,12 +28,12 @@
 
 namespace dlaf {
 namespace internal {
-// DLAF-specific transform, templated on a backend. This, together with
-// when_all, takes the place of dataflow(executor, ...) for futures.
+/// DLAF-specific transform, templated on a backend. This, together with
+/// when_all, takes the place of dataflow(executor, ...) for futures.
 template <Backend B>
 struct Transform;
 
-// For Backend::MC we use the regular thread pool scheduler from HPX.
+/// The Backend::MC specializatoin uses regular thread pool scheduler from HPX.
 template <>
 struct Transform<Backend::MC> {
   template <typename S, typename F>
@@ -46,7 +46,11 @@ struct Transform<Backend::MC> {
 };
 
 #ifdef DLAF_WITH_CUDA
-// For Backend::GPU we use a custom sender.
+/// The Backend::GPU specialization uses a custom sender. The custom sender,
+/// when connected to a receiver, chooses an approprate stream or handle pool
+/// depending on what the callable accepts, calls the given callable with an
+/// element from a pool, and signals the receiver when the operation is ready
+/// (notified using a CUDA event).
 template <>
 struct Transform<Backend::GPU> {
   template <typename S, typename F>
@@ -188,20 +192,24 @@ struct Transform<Backend::GPU> {
 };
 #endif
 
-// Lazy transform. This does not submit the work and returns a sender.
+/// Lazy transform. This does not submit the work and returns a sender.
 template <Backend B, typename F, typename Sender>
 [[nodiscard]] decltype(auto) transform(const Policy<B> policy, F&& f, Sender&& sender) {
   return internal::Transform<B>::call(policy, std::forward<Sender>(sender), std::forward<F>(f));
 }
 
-// Lazy transform. This does not submit the work and returns a sender.
+/// Lazy transform. This does not submit the work and returns a sender. First
+/// lifts non-senders into senders using just, and then calls transform with a
+/// when_all sender of the lifted senders.
 template <Backend B, typename F, typename... Ts>
 [[nodiscard]] decltype(auto) transformLift(const Policy<B> policy, F&& f, Ts&&... ts) {
   return internal::Transform<B>::call(policy, internal::whenAllLift(std::forward<Ts>(ts)...),
                                       std::forward<F>(f));
 }
 
-// Fire-and-forget transform. This submits the work and returns void.
+/// Fire-and-forget transform. This submits the work and returns void. First
+/// lifts non-senders into senders using just, and then calls transform with a
+/// when_all sender of the lifted senders.
 template <Backend B, typename F, typename... Ts>
 void transformLiftDetach(const Policy<B> policy, F&& f, Ts&&... ts) {
   hpx::execution::experimental::detach(

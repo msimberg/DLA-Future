@@ -18,8 +18,8 @@
 
 namespace dlaf {
 namespace internal {
-// when_all-like utility which makes senders out of non-senders before passing
-// them to when_all.
+/// Helper function which behaves similarly to when_all with the exception that
+/// non-senders are first turned into senders using just.
 template <typename... Ts>
 auto whenAllLift(Ts&&... ts) {
   return hpx::execution::experimental::when_all(liftNonSender<Ts>(std::forward<Ts>(ts))...);

@@ -202,7 +202,7 @@ DLAF_MAKE_CALLABLE_OBJECT(trsm);
                                                                                                 \
   template <Backend B>                                                                          \
   auto fname(const dlaf::internal::Policy<B> p) {                                               \
-    return dlaf::internal::PartialAlgorithm{p, fname##_o};                                      \
+    return dlaf::internal::PartialTransform{p, fname##_o};                                      \
   }                                                                                             \
                                                                                                 \
   template <Backend B, typename T1, typename T2, typename... Ts>                                \
@@ -236,7 +236,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm)
 // /// side.
 // template <Backend B>
 // auto trsm(const dlaf::internal::Policy<B> p) {
-//   return dlaf::internal::PartialAlgorithm<B, decltype(trsm_o)>{p, trsm_o};
+//   return dlaf::internal::PartialTransform<B, decltype(trsm_o)>{p, trsm_o};
 // }
 
 // /// Performs a triangular solve. This overload takes a policy argument and
@@ -263,7 +263,7 @@ DLAF_MAKE_TILE_ALGORITHM_SENDER_OVERLOADS(trsm)
 // /// sender on the left-hand side.
 // template <Backend B>
 // auto gemm(const dlaf::internal::Policy<B> p) {
-//   return dlaf::internal::PartialAlgorithm<B, decltype(gemm_o)>{p, gemm_o};
+//   return dlaf::internal::PartialTransform<B, decltype(gemm_o)>{p, gemm_o};
 // }
 
 // /// Computes general matrix matrix multiplication.This overload takes a policy
