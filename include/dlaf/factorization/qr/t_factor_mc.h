@@ -67,7 +67,7 @@ void QR_Tfactor<Backend::MC, Device::CPU, T>::call(
     const SizeType k, Matrix<const T, Device::CPU>& v, const GlobalTileIndex v_start,
     hpx::shared_future<common::internal::vector<T>> taus, hpx::future<matrix::Tile<T, Device::CPU>> t,
     common::Pipeline<comm::CommunicatorGrid>& serial_comm) {
-  using hpx::util::unwrapping;
+  using hpx::unwrapping;
   using common::make_data;
   using namespace comm::sync;
 
