@@ -17,15 +17,14 @@
 namespace dlaf {
 namespace internal {
 /// Makes a sender out of the input, if it is not already a sender.
-template <typename S, typename = std::enable_if_t<hpx::execution::experimental::is_sender<S>::value>>
+template <typename S>
 decltype(auto) liftNonSender(S&& s) {
-  return std::forward<S>(s);
-}
-
-/// Makes a sender out of the input, if it is not already a sender.
-template <typename S, typename = std::enable_if_t<!hpx::execution::experimental::is_sender<S>::value>>
-auto liftNonSender(S&& s) {
-  return hpx::execution::experimental::just(std::forward<S>(s));
+  if constexpr (hpx::execution::experimental::is_sender_v<S>) {
+    return std::forward<S>(s);
+  }
+  else {
+    return hpx::execution::experimental::just(std::forward<S>(s));
+  }
 }
 }
 }
