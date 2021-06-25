@@ -10,6 +10,7 @@
 #pragma once
 
 #include <hpx/local/execution.hpp>
+#include <hpx/local/unwrap.hpp>
 
 #include "dlaf/init.h"
 #include "dlaf/sender/policy.h"
@@ -41,7 +42,7 @@ struct Transform<Backend::MC> {
     namespace ex = hpx::execution::experimental;
     return ex::transform(ex::on(std::forward<S>(s),
                                 ex::with_priority(ex::executor{}, policy.priority())),
-                         hpx::util::unwrapping(std::forward<F>(f)));
+                         hpx::unwrapping(std::forward<F>(f)));
   }
 };
 
@@ -64,7 +65,7 @@ struct Transform<Backend::GPU> {
     template <typename G, typename... Us>
     static auto call_helper(cudaStream_t stream, cublasHandle_t cublas_handle,
                             cusolverDnHandle_t cusolver_handle, G&& g, Us&... ts) {
-      using unwrapping_function_type = decltype(hpx::util::unwrapping(std::forward<G>(g)));
+      using unwrapping_function_type = decltype(hpx::unwrapping(std::forward<G>(g)));
       static_assert(std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t> ||
                         std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...> ||
                         std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us...>,
@@ -74,15 +75,15 @@ struct Transform<Backend::GPU> {
       if constexpr (std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t>) {
         (void) cublas_handle;
         (void) cusolver_handle;
-        return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), ts..., stream);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), ts..., stream);
       }
       else if constexpr (std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...>) {
         (void) cusolver_handle;
-        return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), cublas_handle, ts...);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cublas_handle, ts...);
       }
       else if constexpr (std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us...>) {
         (void) cublas_handle;
-        return std::invoke(hpx::util::unwrapping(std::forward<G>(g)), cusolver_handle, ts...);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cusolver_handle, ts...);
       }
     }
 
@@ -119,7 +120,7 @@ struct Transform<Backend::GPU> {
       std::decay_t<F> f;
 
       template <typename E>
-      void set_error(E&& e) && noexcept {
+          void set_error(E&& e) && noexcept {
         hpx::execution::experimental::set_error(std::move(r), std::forward<E>(e));
       }
 

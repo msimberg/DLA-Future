@@ -216,10 +216,10 @@ auto duplicateIfNeeded(hpx::future<Tile<T, Source>> tile) {
   }
   else {
     return hpx::execution::experimental::make_future(
-        dlaf::internal::transform<
-            internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
-                                                               dlaf::matrix::Duplicate<Destination>{},
-                                                               std::move(tile)));
+        dlaf::internal::transform(dlaf::internal::Policy<
+                                      internal::CopyBackend<Source, Destination>::value>(
+                                      hpx::threads::thread_priority::normal),
+                                  dlaf::matrix::Duplicate<Destination>{}, std::move(tile)));
   }
 }
 
@@ -230,11 +230,11 @@ auto duplicateIfNeeded(hpx::shared_future<Tile<T, Source>> tile) {
   }
   else {
     return hpx::execution::experimental::make_future(
-        dlaf::internal::transform<
-            internal::CopyBackend<Source, Destination>::value>(hpx::threads::thread_priority::normal,
-                                                               dlaf::matrix::Duplicate<Destination>{},
-                                                               hpx::execution::experimental::keep_future(
-                                                                   std::move(tile))));
+        dlaf::internal::transform(dlaf::internal::Policy<
+                                      internal::CopyBackend<Source, Destination>::value>(
+                                      hpx::threads::thread_priority::normal),
+                                  dlaf::matrix::Duplicate<Destination>{},
+                                  hpx::execution::experimental::keep_future(std::move(tile))));
   }
 }
 }

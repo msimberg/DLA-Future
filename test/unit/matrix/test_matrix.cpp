@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <hpx/local/unwrap.hpp>
 #include <hpx/local/future.hpp>
 #include <hpx/local/unwrap.hpp>
 
