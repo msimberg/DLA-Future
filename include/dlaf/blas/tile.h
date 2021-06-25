@@ -41,7 +41,7 @@ template <Backend B, class T, Device D>
 void gemm(const blas::Op op_a, const blas::Op op_b, const T alpha, const Tile<const T, D>& a,
           const Tile<const T, D>& b, const T beta, const Tile<T, D>& c);
 
-/// Computes general matrix matrix multiplication. See TODO for details.
+/// \overload gemm
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -49,7 +49,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto gemm(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Computes general matrix matrix multiplication. See TODO for details.
+/// \overload gemm
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -63,8 +63,7 @@ template <Backend B, class T, Device D>
 void hemm(const blas::Side side, const blas::Uplo uplo, const T alpha, const Tile<const T, D>& a,
           const Tile<const T, D>& b, const T beta, const Tile<T, D>& c);
 
-/// Computes matrix matrix multiplication where matrix a is hermitian (symmetric if T is real). See TODO
-/// for details.
+/// \overload hemm
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -72,8 +71,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto hemm(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Computes matrix matrix multiplication where matrix a is hermitian (symmetric if T is real). See TODO
-/// for details.
+/// \overload hemm
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -87,7 +85,7 @@ template <Backend B, class T, Device D>
 void her2k(const blas::Uplo uplo, const blas::Op op, const T alpha, const Tile<const T, D>& a,
            const Tile<const T, D>& b, const BaseType<T> beta, const Tile<T, D>& c);
 
-/// Performs a rank 2k update of hermitian (symmetric if T is real) tile a. See TODO for details.
+/// \overload her2k
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -95,7 +93,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto her2k(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Performs a rank 2k update of hermitian (symmetric if T is real) tile a. See TODO for details.
+/// \overload her2k
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -109,7 +107,7 @@ template <Backend B, class T, Device D>
 void herk(const blas::Uplo uplo, const blas::Op op, const BaseType<T> alpha, const Tile<const T, D>& a,
           const BaseType<T> beta, const Tile<T, D>& c);
 
-/// Performs a rank k update of hermitian (symmetric if T is real) tile a. See TODO for details.
+/// \overload herk
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -117,7 +115,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto herk(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Performs a rank k update of hermitian (symmetric if T is real) tile a. See TODO for details.
+/// \overload herk
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -132,7 +130,7 @@ void trsm(const dlaf::internal::Policy<B>& policy, const blas::Side side, const 
           const blas::Op op, const blas::Diag diag, const T alpha, const Tile<const T, D>& a,
           const Tile<T, D>& b);
 
-/// Performs a triangular solve. See TODO for details.
+/// \overload trsm
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -140,7 +138,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto trsm(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Performs a triangular solve. See TODO for details.
+/// \overload trsm
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.

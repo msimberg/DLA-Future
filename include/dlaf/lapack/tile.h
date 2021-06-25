@@ -132,7 +132,7 @@ template <Backend B, class T, Device D>
 void hegst(const dlaf::internal::Policy<B>&, const int itype, const blas::Uplo uplo, const Tile<T, D>& a,
            const Tile<T, D>& b);
 
-/// Reduce a Hermitian definite generalized eigenproblem to standard form.
+/// \overload hegst
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -140,7 +140,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto hegst(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Reduce a Hermitian definite generalized eigenproblem to standard form.
+/// \overload hegst
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -156,7 +156,7 @@ auto hegst(const dlaf::internal::Policy<B>& p);
 template <Backend B, class T, Device D>
 auto potrfInfo(const dlaf::internal::Policy<B>&, const blas::Uplo uplo, const Tile<T, D>& a);
 
-/// Compute the cholesky decomposition of a (with return code).
+/// \overload potrfInfo
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -164,7 +164,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto potrfInfo(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Compute the cholesky decomposition of a (with return code).
+/// \overload potrfInfo
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
@@ -181,7 +181,7 @@ auto potrfInfo(const dlaf::internal::Policy<B>& p);
 template <Backend B, class T, Device D>
 void potrf(const dlaf::internal::Policy<B>& p, const blas::Uplo uplo, const Tile<T, D>& a);
 
-/// Compute the cholesky decomposition of a.
+/// \overload potrf
 ///
 /// This overload takes a policy argument and a sender which must send all required arguments for the
 /// algorithm. Returns a sender which signals a connected receiver when the algorithm is done.
@@ -189,7 +189,7 @@ template <Backend B, typename Sender,
           typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 auto potrf(const dlaf::internal::Policy<B>& p, Sender&& s);
 
-/// Compute the cholesky decomposition of a.
+/// \overload potrf
 ///
 /// This overload partially applies the algorithm with a policy for later use with operator| with a
 /// sender on the left-hand side.
