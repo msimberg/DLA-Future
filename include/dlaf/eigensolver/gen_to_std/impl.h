@@ -9,6 +9,7 @@
 //
 #pragma once
 
+#include <hpx/local/execution.hpp>
 #include <hpx/local/future.hpp>
 #include <hpx/local/unwrap.hpp>
 
@@ -35,49 +36,52 @@ namespace dlaf {
 namespace eigensolver {
 namespace internal {
 
-template <class Executor, Device device, class T>
-void hegstDiagTile(Executor&& executor_hp, hpx::future<matrix::Tile<T, device>> a_kk,
-                   hpx::future<matrix::Tile<T, device>> l_kk) {
-  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::hegst_o), 1, blas::Uplo::Lower,
-                std::move(a_kk), std::move(l_kk));
+template <Backend backend, typename AKKSender, typename LKKSender>
+void hegstDiagTile(AKKSender&& a_kk, LKKSender&& l_kk) {
+  dlaf::internal::whenAllLift(1, blas::Uplo::Lower, std::forward<AKKSender>(a_kk),
+                              std::forward<LKKSender>(l_kk)) |
+      dlaf::tile::hegst(dlaf::internal::Policy<backend>(hpx::threads::thread_priority::high)) |
+      hpx::execution::experimental::detach();
 }
 
-template <class Executor, Device device, class T>
-void trsmPanelTile(Executor&& executor_hp, hpx::shared_future<matrix::Tile<const T, device>> l_kk,
-                   hpx::future<matrix::Tile<T, device>> a_ik) {
-  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::trsm_o), blas::Side::Right,
-                blas::Uplo::Lower, blas::Op::ConjTrans, blas::Diag::NonUnit, T(1.0), l_kk,
-                std::move(a_ik));
+template <Backend backend, typename T, typename LKKSender, typename AIKSender>
+void trsmPanelTile(LKKSender&& l_kk, AIKSender&& a_ik) {
+  dlaf::internal::whenAllLift(blas::Side::Right, blas::Uplo::Lower, blas::Op::ConjTrans,
+                              blas::Diag::NonUnit, T(1.0), std::forward<LKKSender>(l_kk),
+                              std::forward<AIKSender>(a_ik)) |
+      dlaf::tile::trsm(dlaf::internal::Policy<backend>(hpx::threads::thread_priority::high)) |
+      hpx::execution::experimental::detach();
 }
 
-template <class Executor, Device device, class T>
-void hemmPanelTile(Executor&& executor_hp, hpx::shared_future<matrix::Tile<const T, device>> a_kk,
-                   hpx::shared_future<matrix::Tile<const T, device>> l_ik,
-                   hpx::future<matrix::Tile<T, device>> a_ik) {
-  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::hemm_o), blas::Side::Right,
-                blas::Uplo::Lower, T(-0.5), a_kk, l_ik, T(1.0), std::move(a_ik));
+template <Backend backend, class T, typename AKKSender, typename LIKSender, typename AIKSender>
+void hemmPanelTile(AKKSender&& a_kk, LIKSender&& l_ik, AIKSender&& a_ik) {
+  dlaf::internal::whenAllLift(blas::Side::Right, blas::Uplo::Lower, T(-0.5),
+                              std::forward<AKKSender>(a_kk), std::forward<LIKSender>(l_ik), T(1.0),
+                              std::forward<AIKSender>(a_ik)) |
+      dlaf::tile::hemm(dlaf::internal::Policy<backend>(hpx::threads::thread_priority::high)) |
+      hpx::execution::experimental::detach();
 }
 
 template <class Executor, Device device, class T>
 void her2kTrailingDiagTile(Executor&& ex, hpx::shared_future<matrix::Tile<const T, device>> a_jk,
                            hpx::shared_future<matrix::Tile<const T, device>> l_jk,
                            hpx::future<matrix::Tile<T, device>> a_kk) {
-  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::her2k_o), blas::Uplo::Lower, blas::Op::NoTrans,
-                T(-1.0), a_jk, l_jk, BaseType<T>(1.0), std::move(a_kk));
+  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::internal::her2k_o), blas::Uplo::Lower,
+                blas::Op::NoTrans, T(-1.0), a_jk, l_jk, BaseType<T>(1.0), std::move(a_kk));
 }
 
 template <class Executor, Device device, class T>
 void gemmTrailingMatrixTile(Executor&& ex, hpx::shared_future<matrix::Tile<const T, device>> mat_ik,
                             hpx::shared_future<matrix::Tile<const T, device>> mat_jk,
                             hpx::future<matrix::Tile<T, device>> a_ij) {
-  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::gemm_o), blas::Op::NoTrans, blas::Op::ConjTrans,
-                T(-1.0), mat_ik, mat_jk, T(1.0), std::move(a_ij));
+  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::internal::gemm_o), blas::Op::NoTrans,
+                blas::Op::ConjTrans, T(-1.0), mat_ik, mat_jk, T(1.0), std::move(a_ij));
 }
 
 template <class Executor, Device device, class T>
 void trsmPanelUpdateTile(Executor&& executor_hp, hpx::shared_future<matrix::Tile<const T, device>> l_jj,
                          hpx::future<matrix::Tile<T, device>> a_jk) {
-  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::trsm_o), blas::Side::Left,
+  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::internal::trsm_o), blas::Side::Left,
                 blas::Uplo::Lower, blas::Op::NoTrans, blas::Diag::NonUnit, T(1.0), l_jj,
                 std::move(a_jk));
 }
@@ -86,8 +90,8 @@ template <class Executor, Device device, class T>
 void gemmPanelUpdateTile(Executor&& ex, hpx::shared_future<matrix::Tile<const T, device>> l_ij,
                          hpx::shared_future<matrix::Tile<const T, device>> a_jk,
                          hpx::future<matrix::Tile<T, device>> a_ik) {
-  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::gemm_o), blas::Op::NoTrans, blas::Op::NoTrans,
-                T(-1.0), l_ij, a_jk, T(1.0), std::move(a_ik));
+  hpx::dataflow(ex, matrix::unwrapExtendTiles(tile::internal::gemm_o), blas::Op::NoTrans,
+                blas::Op::NoTrans, T(-1.0), l_ij, a_jk, T(1.0), std::move(a_ik));
 }
 
 // Implementation based on LAPACK Algorithm for the transformation from generalized to standard
@@ -104,7 +108,7 @@ void GenToStd<backend, device, T>::call_L(Matrix<T, device>& mat_a, Matrix<T, de
     const LocalTileIndex kk{k, k};
 
     // Direct transformation to standard eigenvalue problem of the diagonal tile
-    hegstDiagTile(executor_hp, mat_a(kk), mat_l(kk));
+    hegstDiagTile<backend>(mat_a.readwrite_sender(kk), mat_l.readwrite_sender(kk));
 
     // If there is no trailing matrix
     if (k == nrtile - 1)
@@ -112,8 +116,8 @@ void GenToStd<backend, device, T>::call_L(Matrix<T, device>& mat_a, Matrix<T, de
 
     for (SizeType i = k + 1; i < nrtile; ++i) {
       const LocalTileIndex ik{i, k};
-      trsmPanelTile(executor_hp, mat_l.read(kk), mat_a(ik));
-      hemmPanelTile(executor_hp, mat_a.read(kk), mat_l.read(ik), mat_a(ik));
+      trsmPanelTile<backend, T>(mat_l.read_sender(kk), mat_a.readwrite_sender(ik));
+      hemmPanelTile<backend, T>(mat_a.read_sender(kk), mat_l.read_sender(ik), mat_a(ik));
     }
 
     for (SizeType j = k + 1; j < nrtile; ++j) {
@@ -134,7 +138,7 @@ void GenToStd<backend, device, T>::call_L(Matrix<T, device>& mat_a, Matrix<T, de
 
     for (SizeType i = k + 1; i < nrtile; ++i) {
       const LocalTileIndex ik{i, k};
-      hemmPanelTile(executor_np, mat_a.read(kk), mat_l.read(ik), mat_a(ik));
+      hemmPanelTile<backend, T>(mat_a.read_sender(kk), mat_l.read_sender(ik), mat_a(ik));
     }
 
     for (SizeType j = k + 1; j < nrtile; ++j) {
@@ -265,7 +269,7 @@ void GenToStd<backend, device, T>::call_L(comm::CommunicatorGrid grid, Matrix<T,
 
     // Direct transformation to standard eigenvalue problem of the diagonal tile
     if (kk_rank == this_rank)
-      hegstDiagTile(executor_hp, mat_a(kk), mat_l(kk));
+      hegstDiagTile<backend>(mat_a.readwrite_sender(kk), mat_l.readwrite_sender(kk));
 
     // If there is no trailing matrix
     if (k == nrtile - 1)
@@ -292,8 +296,8 @@ void GenToStd<backend, device, T>::call_L(comm::CommunicatorGrid grid, Matrix<T,
         const LocalTileIndex ik_panel(Coord::Row, i_local);
         const LocalTileIndex ik(i_local, distr.localTileFromGlobalTile<Coord::Col>(k));
 
-        trsmPanelTile(executor_hp, l_panelT.read(diag_wp_idx), mat_a(ik));
-        hemmPanelTile(executor_hp, a_panelT.read(diag_wp_idx), mat_l.read(ik), mat_a(ik));
+        trsmPanelTile<backend, T>(l_panelT.read_sender(diag_wp_idx), mat_a.readwrite_sender(ik));
+        hemmPanelTile<backend, T>(a_panelT.read_sender(diag_wp_idx), mat_l.read_sender(ik), mat_a(ik));
 
         // keep diagonal tile for later.
         a_diag = a_panelT.read(diag_wp_idx);
@@ -354,7 +358,8 @@ void GenToStd<backend, device, T>::call_L(comm::CommunicatorGrid grid, Matrix<T,
         const LocalTileIndex local_idx(Coord::Row, i_local);
         const LocalTileIndex ik(i_local, distr.localTileFromGlobalTile<Coord::Col>(k));
 
-        hemmPanelTile(executor_hp, a_diag, mat_l.read(ik), mat_a(ik));
+        hemmPanelTile<backend, T>(hpx::execution::experimental::keep_future(a_diag),
+                                  mat_l.read_sender(ik), mat_a.readwrite_sender(ik));
       }
     }
   }

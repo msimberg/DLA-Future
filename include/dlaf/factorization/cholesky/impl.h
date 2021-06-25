@@ -76,14 +76,14 @@ void gemmTrailingMatrixTile(hpx::threads::thread_priority priority, PanelTileSen
 namespace cholesky_u {
 template <class Executor, Device device, class T>
 void potrfDiagTile(Executor&& exec, hpx::future<matrix::Tile<T, device>> matrix_tile) {
-  hpx::dataflow(exec, matrix::unwrapExtendTiles(tile::potrf_o), blas::Uplo::Upper,
+  hpx::dataflow(exec, matrix::unwrapExtendTiles(tile::internal::potrf_o), blas::Uplo::Upper,
                 std::move(matrix_tile));
 }
 
 template <class Executor, Device device, class T>
 void trsmPanelTile(Executor&& executor_hp, hpx::shared_future<matrix::Tile<const T, device>> kk_tile,
                    hpx::future<matrix::Tile<T, device>> matrix_tile) {
-  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::trsm_o), blas::Side::Left,
+  hpx::dataflow(executor_hp, matrix::unwrapExtendTiles(tile::internal::trsm_o), blas::Side::Left,
                 blas::Uplo::Upper, blas::Op::ConjTrans, blas::Diag::NonUnit, T(1.0), std::move(kk_tile),
                 std::move(matrix_tile));
 }
@@ -92,8 +92,8 @@ template <class Executor, Device device, class T>
 void herkTrailingDiagTile(Executor&& trailing_matrix_executor,
                           hpx::shared_future<matrix::Tile<const T, device>> panel_tile,
                           hpx::future<matrix::Tile<T, device>> matrix_tile) {
-  hpx::dataflow(trailing_matrix_executor, matrix::unwrapExtendTiles(tile::herk_o), blas::Uplo::Upper,
-                blas::Op::ConjTrans, BaseType<T>(-1.0), panel_tile, BaseType<T>(1.0),
+  hpx::dataflow(trailing_matrix_executor, matrix::unwrapExtendTiles(tile::internal::herk_o),
+                blas::Uplo::Upper, blas::Op::ConjTrans, BaseType<T>(-1.0), panel_tile, BaseType<T>(1.0),
                 std::move(matrix_tile));
 }
 
@@ -102,9 +102,9 @@ void gemmTrailingMatrixTile(Executor&& trailing_matrix_executor,
                             hpx::shared_future<matrix::Tile<const T, device>> panel_tile,
                             hpx::shared_future<matrix::Tile<const T, device>> col_panel,
                             hpx::future<matrix::Tile<T, device>> matrix_tile) {
-  hpx::dataflow(trailing_matrix_executor, matrix::unwrapExtendTiles(tile::gemm_o), blas::Op::ConjTrans,
-                blas::Op::NoTrans, T(-1.0), std::move(panel_tile), std::move(col_panel), T(1.0),
-                std::move(matrix_tile));
+  hpx::dataflow(trailing_matrix_executor, matrix::unwrapExtendTiles(tile::internal::gemm_o),
+                blas::Op::ConjTrans, blas::Op::NoTrans, T(-1.0), std::move(panel_tile),
+                std::move(col_panel), T(1.0), std::move(matrix_tile));
 }
 }
 
