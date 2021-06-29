@@ -10,8 +10,8 @@
 
 #pragma once
 
-#include <hpx/future.hpp>
-#include <hpx/include/util.hpp>
+#include <hpx/local/future.hpp>
+#include <hpx/local/unwrap.hpp>
 
 #include <blas.hh>
 

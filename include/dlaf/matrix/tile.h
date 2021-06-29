@@ -14,9 +14,9 @@
 #include <ostream>
 #include <type_traits>
 
-#include <hpx/functional.hpp>
+#include <hpx/local/functional.hpp>
 #include <hpx/local/future.hpp>
-#include <hpx/tuple.hpp>
+#include <hpx/local/tuple.hpp>
 
 #include "dlaf/common/data_descriptor.h"
 #include "dlaf/matrix/index.h"
