@@ -14,6 +14,7 @@
 
 #include "dlaf/init.h"
 #include "dlaf/sender/policy.h"
+#include "dlaf/sender/typelist.h"
 #include "dlaf/sender/when_all_lift.h"
 #include "dlaf/types.h"
 
@@ -34,7 +35,7 @@ namespace internal {
 template <Backend B>
 struct Transform;
 
-/// The Backend::MC specializatoin uses regular thread pool scheduler from HPX.
+/// The Backend::MC specialization uses regular thread pool scheduler from HPX.
 template <>
 struct Transform<Backend::MC> {
   template <typename S, typename F>
@@ -64,26 +65,31 @@ struct Transform<Backend::GPU> {
 
     template <typename G, typename... Us>
     static auto call_helper(cudaStream_t stream, cublasHandle_t cublas_handle,
-                            cusolverDnHandle_t cusolver_handle, G&& g, Us&... ts) {
+                            cusolverDnHandle_t cusolver_handle, G&& g, Us&... us) {
       using unwrapping_function_type = decltype(hpx::unwrapping(std::forward<G>(g)));
-      static_assert(std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t> ||
-                        std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...> ||
-                        std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us...>,
+      constexpr bool is_cuda_stream_invocable =
+          std::is_invocable_v<unwrapping_function_type, Us&..., cudaStream_t>;
+      constexpr bool is_cublas_handle_invocable =
+          std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us&...>;
+      constexpr bool is_cusolver_handle_invocable =
+          std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us&...>;
+      static_assert(is_cuda_stream_invocable || is_cublas_handle_invocable ||
+                        is_cusolver_handle_invocable,
                     "function passed to transform<GPU> must be invocable with a cublasStream_t as the "
                     "last argument or a cublasHandle_t/cusolverDnHandle_t as the first argument");
 
-      if constexpr (std::is_invocable_v<unwrapping_function_type, Us..., cudaStream_t>) {
+      if constexpr (is_cuda_stream_invocable) {
         (void) cublas_handle;
         (void) cusolver_handle;
-        return std::invoke(hpx::unwrapping(std::forward<G>(g)), ts..., stream);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), us..., stream);
       }
-      else if constexpr (std::is_invocable_v<unwrapping_function_type, cublasHandle_t, Us...>) {
+      else if constexpr (is_cublas_handle_invocable) {
         (void) cusolver_handle;
-        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cublas_handle, ts...);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cublas_handle, us...);
       }
-      else if constexpr (std::is_invocable_v<unwrapping_function_type, cusolverDnHandle_t, Us...>) {
+      else if constexpr (is_cusolver_handle_invocable) {
         (void) cublas_handle;
-        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cusolver_handle, ts...);
+        return std::invoke(hpx::unwrapping(std::forward<G>(g)), cusolver_handle, us...);
       }
     }
 
@@ -100,12 +106,12 @@ struct Transform<Backend::GPU> {
     };
 
     template <template <typename...> class Tuple, template <typename...> class Variant>
-    using value_types = hpx::util::detail::unique_t<hpx::util::detail::transform_t<
+    using value_types = dlaf::internal::UniquePackT<dlaf::internal::TransformPackT<
         typename hpx::execution::experimental::sender_traits<S>::template value_types<Tuple, Variant>,
         invoke_result_helper>>;
 
     template <template <typename...> class Variant>
-    using error_types = hpx::util::detail::unique_t<hpx::util::detail::prepend_t<
+    using error_types = dlaf::internal::UniquePackT<dlaf::internal::PrependPackT<
         typename hpx::execution::experimental::sender_traits<S>::template error_types<Variant>,
         std::exception_ptr>>;
 
@@ -194,7 +200,8 @@ struct Transform<Backend::GPU> {
 #endif
 
 /// Lazy transform. This does not submit the work and returns a sender.
-template <Backend B, typename F, typename Sender>
+template <Backend B, typename F, typename Sender,
+          typename = std::enable_if_t<hpx::execution::experimental::is_sender_v<Sender>>>
 [[nodiscard]] decltype(auto) transform(const Policy<B> policy, F&& f, Sender&& sender) {
   return internal::Transform<B>::call(policy, std::forward<Sender>(sender), std::forward<F>(f));
 }
