@@ -14,9 +14,7 @@ spack:
       variants:
         - '~cuda'
         - '~openmp'
-    hpx:
-      variants:
-        - 'max_cpu_count=128'
+    pika:
     mpich:
       variants:
         - '~fortran'
