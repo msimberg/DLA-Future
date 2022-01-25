@@ -152,6 +152,8 @@ struct choleskyMiniapp {
           DLAF_MPI_CALL(MPI_Barrier(world));
         }
         elapsed_time = timeit.elapsed();
+
+        matrix.get().waitLocalTiles();
       }
 
       double gigaflops;
@@ -178,7 +180,9 @@ struct choleskyMiniapp {
         copy(matrix_ref, original);
         check_cholesky(original, matrix_host, comm_grid, opts.uplo);
       }
+      matrix_host.waitLocalTiles();
     }
+    matrix_ref.waitLocalTiles();
   }
 };
 
@@ -188,6 +192,7 @@ int pika_main(pika::program_options::variables_map& vm) {
     const Options opts(vm);
 
     dlaf::miniapp::dispatchMiniapp<choleskyMiniapp>(opts);
+    pika::threads::get_thread_manager().wait();
   }
 
   return pika::finalize();
