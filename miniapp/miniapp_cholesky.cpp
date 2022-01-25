@@ -17,6 +17,7 @@
 #include <hpx/local/runtime.hpp>
 #include <hpx/local/unwrap.hpp>
 #include <hpx/program_options.hpp>
+#include <hpx/include/threadmanager.hpp>
 
 #include "dlaf/auxiliary/norm.h"
 #include "dlaf/blas/tile.h"
@@ -152,6 +153,8 @@ struct choleskyMiniapp {
           DLAF_MPI_CALL(MPI_Barrier(world));
         }
         elapsed_time = timeit.elapsed();
+
+        matrix.get().waitLocalTiles();
       }
 
       double gigaflops;
@@ -178,7 +181,9 @@ struct choleskyMiniapp {
         copy(matrix_ref, original);
         check_cholesky(original, matrix_host, comm_grid, opts.uplo);
       }
+      matrix_host.waitLocalTiles();
     }
+    matrix_ref.waitLocalTiles();
   }
 };
 
@@ -188,6 +193,7 @@ int hpx_main(hpx::program_options::variables_map& vm) {
     const Options opts(vm);
 
     dlaf::miniapp::dispatchMiniapp<choleskyMiniapp>(opts);
+    hpx::threads::get_thread_manager().wait();
   }
 
   return hpx::finalize();
