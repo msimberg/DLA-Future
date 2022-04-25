@@ -8,6 +8,10 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 
+// TODO: Remove. This is only temporary to fix the missing includes in transform_mpi.hpp.
+#include <pika/datastructures/variant.hpp>
+#include <pika/functional/invoke_fused.hpp>
+#include <pika/mpi.hpp>
 #include <pika/runtime.hpp>
 
 #include <dlaf/common/assert.h>
@@ -49,6 +53,7 @@ template <>
 struct Init<Backend::MC> {
   static void initialize(configuration const& cfg) {
     memory::internal::initializeUmpireHostAllocator(cfg.umpire_host_memory_pool_initial_bytes);
+    pika::mpi::experimental::init(false, cfg.mpi_pool);
   }
 
   static void finalize() {

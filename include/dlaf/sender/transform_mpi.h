@@ -9,6 +9,7 @@
 //
 #pragma once
 
+#include <pika/mpi.hpp>
 #include <pika/unwrap.hpp>
 #include <type_traits>
 
@@ -57,54 +58,32 @@ template <typename F>
 struct MPICallHelper {
   std::decay_t<F> f;
   template <typename... Ts>
-  auto operator()(Ts&&... ts) -> decltype(pika::unwrapping(std::move(f))(
-      unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))...,
-      std::declval<MPI_Request*>())) {
-    MPI_Request req;
-    auto is_request_completed = [&req] {
-      int flag;
-      MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
-      return flag == 0;
-    };
-
-    // Note:
-    // Callables passed to transformMPI have their arguments passed by reference, but doing so
-    // with PromiseGuard would keep the guard alive until the completion of the MPI operation,
-    // whereas we are only looking to guard the submission of the MPI operation.
-    // Moreover, the callable requires a Communicator to make its job, and it should be agnostic of
-    // it being wrapped in a PromiseGuard or not.
-    // We therefore use unwrapPromiseGuardCommunicator to pass the Communicator& into a transformMPI
-    // callables, then after returning from the callable, the PromiseGuard<Communicator> gets explicitly
-    // released using the helper consumePromiseGuard.
-    using result_type = decltype(pika::unwrapping(
-        std::move(f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))..., &req));
+  auto operator()(Ts&&... ts) -> decltype(pika::unwrapping(std::move(f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))...)) {
+    using result_type =          decltype(pika::unwrapping(std::move(f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))...));
     if constexpr (std::is_void_v<result_type>) {
-      pika::unwrapping(std::move(
-          f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))..., &req);
+                                          pika::unwrapping(std::move(f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))...);
       (internal::consumePromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts)), ...);
-      pika::util::yield_while(is_request_completed);
     }
     else {
-      auto r = pika::unwrapping(std::move(
-          f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))..., &req);
+      auto r =                            pika::unwrapping(std::move(f))(unwrapPromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts))...);
       (internal::consumePromiseGuardCommunicator(dlaf::internal::getReferenceWrapper(ts)), ...);
-      pika::util::yield_while(is_request_completed);
       return r;
     }
   }
 };
 
 template <typename F>
-MPICallHelper(F &&) -> MPICallHelper<std::decay_t<F>>;
+MPICallHelper(F&&) -> MPICallHelper<std::decay_t<F>>;
 
 /// Lazy transformMPI. This does not submit the work and returns a sender.
 template <typename F, typename Sender,
           typename = std::enable_if_t<pika::execution::experimental::is_sender_v<Sender>>>
 [[nodiscard]] decltype(auto) transformMPI(F&& f, Sender&& sender) {
   namespace ex = pika::execution::experimental;
+  namespace mpi = pika::mpi::experimental;
 
   return ex::transfer(std::forward<Sender>(sender), dlaf::internal::getMPIScheduler()) |
-         ex::then(MPICallHelper{std::forward<F>(f)});
+         mpi::transform_mpi(MPICallHelper{std::forward<F>(f)});
 }
 
 /// Fire-and-forget transformMPI. This submits the work and returns void.
