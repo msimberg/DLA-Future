@@ -23,6 +23,8 @@
 #include <iostream>
 #include <memory>
 
+#define DLAF_USE_SEPARATE_MPI_POOL 1
+
 namespace dlaf {
 std::ostream& operator<<(std::ostream& os, configuration const& cfg) {
   os << "  num_np_cuda_streams_per_thread = " << cfg.num_np_cuda_streams_per_thread << std::endl;
@@ -237,9 +239,10 @@ ScopedInitializer::~ScopedInitializer() {
 void initResourcePartitionerHandler(pika::resource::partitioner& rp,
                                     pika::program_options::variables_map const& vm) {
   // Don't create the MPI pool if the user disabled it
-  if (vm["dlaf:no-mpi-pool"].as<bool>())
-    return;
+  // if (vm["dlaf:no-mpi-pool"].as<bool>())
+  //   return;
 
+#if DLAF_USE_SEPARATE_MPI_POOL
   // Don't create the MPI pool if there is a single process
   int ntasks;
   DLAF_MPI_CHECK_ERROR(MPI_Comm_size(MPI_COMM_WORLD, &ntasks));
@@ -255,5 +258,6 @@ void initResourcePartitionerHandler(pika::resource::partitioner& rp,
   // communication related tasks
   rp.create_thread_pool("mpi", pika::resource::scheduling_policy::local_priority_fifo, mode);
   rp.add_resource(rp.numa_domains()[0].cores()[0].pus()[0], "mpi");
+#endif
 }
 }
