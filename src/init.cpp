@@ -23,7 +23,7 @@
 #include <iostream>
 #include <memory>
 
-#define DLAF_USE_SEPARATE_MPI_POOL 1
+#define DLAF_USE_SEPARATE_MPI_POOL 0
 
 namespace dlaf {
 std::ostream& operator<<(std::ostream& os, configuration const& cfg) {
