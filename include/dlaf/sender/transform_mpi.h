@@ -79,9 +79,11 @@ MPICallHelper(F&&) -> MPICallHelper<std::decay_t<F>>;
 template <typename F, typename Sender,
           typename = std::enable_if_t<pika::execution::experimental::is_sender_v<Sender>>>
 [[nodiscard]] decltype(auto) transformMPI(F&& f, Sender&& sender) {
+  namespace ex = pika::execution::experimental;
   namespace mpi = pika::mpi::experimental;
 
-  return std::forward<Sender>(sender) | mpi::transform_mpi(MPICallHelper{std::forward<F>(f)});
+  return ex::transfer(std::forward<Sender>(sender), dlaf::internal::getMPIScheduler()) |
+         mpi::transform_mpi(MPICallHelper{std::forward<F>(f)});
 }
 
 /// Fire-and-forget transformMPI. This submits the work and returns void.
