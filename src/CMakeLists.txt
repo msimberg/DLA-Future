@@ -253,6 +253,17 @@ DLAF_addSublibrary(
   LIBRARIES dlaf.core
 )
 
+target_compile_options(
+  dlaf.core PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow -Wno-error=array-bounds>
+)
+target_compile_options(dlaf.eigensolver PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=array-bounds>)
+target_compile_options(
+  dlaf.tridiagonal_eigensolver PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=array-bounds>
+)
+target_compile_options(dlaf.factorization PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=array-bounds>)
+target_compile_options(dlaf.multiplication PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=array-bounds>)
+target_compile_options(dlaf.solver PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-error=array-bounds>)
+
 # Define DLAF's complete library
 add_library(
   DLAF
