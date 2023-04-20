@@ -292,6 +292,7 @@ auto computePanelReflectors(MatrixLike& mat_a, const matrix::SubPanelView& panel
                   [nthreads, nrefls, cols = panel_view.cols()](const std::size_t index,
                                                                auto& barrier_ptr, auto& w, auto& taus,
                                                                auto& tiles) {
+                    const auto barrier_busy_wait = getReductionToBandBarrierBusyWait();
                     const std::size_t batch_size = util::ceilDiv(tiles.size(), nthreads);
                     const std::size_t begin = index * batch_size;
                     const std::size_t end = std::min(index * batch_size + batch_size, tiles.size());
@@ -305,7 +306,7 @@ auto computePanelReflectors(MatrixLike& mat_a, const matrix::SubPanelView& panel
                       // STEP1: compute tau and reflector (single-thread)
                       if (index == 0)
                         taus.emplace_back(computeReflector(tiles, j));
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP2a: compute w (multi-threaded)
                       const SizeType pt_cols = cols - (j + 1);
@@ -315,16 +316,16 @@ auto computePanelReflectors(MatrixLike& mat_a, const matrix::SubPanelView& panel
 
                       w[index] = common::internal::vector<T>(pt_cols, 0);
                       computeWTrailingPanel(has_head, tiles, w[index], j, pt_cols, begin, end);
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP2b: reduce w results (single-threaded)
                       if (index == 0)
                         dlaf::eigensolver::internal::reduceColumnVectors(w);
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP3: update trailing panel (multi-threaded)
                       updateTrailingPanel(has_head, tiles, j, w[0], taus.back(), begin, end);
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
                     }
                   }) |
          ex::then([](auto barrier_ptr, auto w, auto taus, auto tiles) {
@@ -612,6 +613,7 @@ auto computePanelReflectors(TriggerSender&& trigger, comm::IndexT_MPI rank_v0,
                                              auto& taus, auto& tiles, auto&& pcomm) {
                     const bool rankHasHead = rank_v0 == pcomm.ref().rank();
 
+                    const auto barrier_busy_wait = getReductionToBandBarrierBusyWait();
                     const std::size_t batch_size = util::ceilDiv(tiles.size(), nthreads);
                     const std::size_t begin = index * batch_size;
                     const std::size_t end = std::min(index * batch_size + batch_size, tiles.size());
@@ -627,7 +629,7 @@ auto computePanelReflectors(TriggerSender&& trigger, comm::IndexT_MPI rank_v0,
                         const bool has_head = rankHasHead;
                         taus.emplace_back(computeReflector(has_head, pcomm.ref(), tiles, j));
                       }
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP2a: compute w (multi-threaded)
                       const SizeType pt_cols = cols - (j + 1);
@@ -638,7 +640,7 @@ auto computePanelReflectors(TriggerSender&& trigger, comm::IndexT_MPI rank_v0,
 
                       w[index] = common::internal::vector<T>(pt_cols, 0);
                       computeWTrailingPanel(has_head, tiles, w[index], j, pt_cols, begin, end);
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP2b: reduce w results (single-threaded)
                       if (index == 0) {
@@ -646,11 +648,11 @@ auto computePanelReflectors(TriggerSender&& trigger, comm::IndexT_MPI rank_v0,
                         comm::sync::allReduceInPlace(pcomm.ref(), MPI_SUM,
                                                      common::make_data(w[0].data(), pt_cols));
                       }
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
                       // STEP3: update trailing panel (multi-threaded)
                       updateTrailingPanel(has_head, tiles, j, w[0], taus.back(), begin, end);
-                      barrier_ptr->arrive_and_wait();
+                      barrier_ptr->arrive_and_wait(barrier_busy_wait);
                     }
                   }) |
          ex::then([](auto barrier_ptr, auto w, auto taus, auto tiles, auto pcomm) {

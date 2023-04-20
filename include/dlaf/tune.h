@@ -19,6 +19,9 @@ namespace dlaf {
 /// - red2band_panel_nworkers:
 ///     The maximum number of threads to use for computing the panel in the reduction to band algorithm.
 ///     Set with --dlaf:red2band-panel-nworkers or env variable DLAF_RED2BAND_PANEL_NWORKERS.
+/// - red2band_barrier_busy_wait_us:
+//      The duration in microseconds to busy-wait in barriers in the reduction to band algorithm.
+///     Set with --dlaf:red2band-barrier-busy-wait-us or env variable DLAF_RED2BAND_BARRIER_BUSY_WAIT_US.
 /// - eigensolver_min_band:
 ///     The minimum value to start looking for a divisor of the block size.
 ///     Set with --dlaf:eigensolver-min-band or env variable DLAF_EIGENSOLVER_MIN_BAND.
@@ -32,8 +35,9 @@ namespace dlaf {
 ///     DLAF_BT_BAND_TO_TRIDIAG_HH_APPLY_GROUP_SIZE.
 /// Note to developers: Users can change these values, therefore consistency has to be ensured by algorithms.
 struct TuneParameters {
-  size_t red2band_panel_nworkers =
-      std::max<size_t>(1, pika::resource::get_thread_pool("default").get_os_thread_count() / 2);
+  std::size_t red2band_panel_nworkers =
+      std::max<std::size_t>(1, pika::resource::get_thread_pool("default").get_os_thread_count() / 2);
+  std::size_t red2band_barrier_busy_wait_us = 0;
 
   SizeType eigensolver_min_band = 100;
   SizeType band_to_tridiag_1d_block_size_base = 8192;

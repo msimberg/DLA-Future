@@ -29,4 +29,9 @@ inline size_t getReductionToBandPanelNWorkers() noexcept {
   return std::max<std::size_t>(1, std::min<std::size_t>(max_workers, nworkers));
 }
 
+// TODO: Move to separate file.
+inline std::chrono::duration<double> getReductionToBandBarrierBusyWait() noexcept {
+  return std::chrono::microseconds(getTuneParameters().red2band_barrier_busy_wait_us);
+}
+
 }
