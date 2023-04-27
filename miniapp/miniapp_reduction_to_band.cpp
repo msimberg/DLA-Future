@@ -199,6 +199,7 @@ int main(int argc, char** argv) {
   // clang-format on
 
   pika::init_params p;
+  p.cfg = {"pika.thread_queue.min_tasks_to_steal_pending=2", "pika.thread_queue.min_tasks_to_steal_staged=2"};
   p.desc_cmdline = desc_commandline;
   p.rp_callback = dlaf::initResourcePartitionerHandler;
   return pika::init(pika_main, argc, argv, p);
