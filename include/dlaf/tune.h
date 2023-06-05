@@ -49,10 +49,10 @@ namespace dlaf {
 struct TuneParameters {
   std::size_t red2band_panel_nworkers =
       std::max<std::size_t>(1, pika::resource::get_thread_pool("default").get_os_thread_count() / 2);
-  std::size_t red2band_barrier_busy_wait_us = 1000;
+  std::size_t red2band_barrier_busy_wait_us = 1;
   std::size_t tridiag_rank1_nworkers =
       std::max<std::size_t>(1, pika::resource::get_thread_pool("default").get_os_thread_count() / 2);
-  std::size_t tridiag_rank1_barrier_busy_wait_us = 1000;
+  std::size_t tridiag_rank1_barrier_busy_wait_us = 1;
 
   SizeType eigensolver_min_band = 100;
   SizeType band_to_tridiag_1d_block_size_base = 8192;
