@@ -26,6 +26,9 @@
 #include <dlaf/tune.h>
 
 namespace dlaf {
+	namespace gpulapack::kernels {
+		void dummy_host();
+	}
 std::ostream& operator<<(std::ostream& os, const configuration& cfg) {
   os << "  num_np_gpu_streams_per_thread = " << cfg.num_np_gpu_streams_per_thread << std::endl;
   os << "  num_hp_gpu_streams_per_thread = " << cfg.num_hp_gpu_streams_per_thread << std::endl;
@@ -97,6 +100,9 @@ struct Init<Backend::GPU> {
     memory::internal::initializeUmpireDeviceAllocator(cfg.umpire_device_memory_pool_initial_bytes);
     initializeGpuPool(device, cfg.num_np_gpu_streams_per_thread, cfg.num_hp_gpu_streams_per_thread);
     pika::cuda::experimental::detail::register_polling(pika::resource::get_thread_pool("default"));
+#if defined(DLAF_WITH_HIP)
+    dlaf::gpulapack::kernels::dummy_host();
+#endif
   }
 
   static void finalize() {

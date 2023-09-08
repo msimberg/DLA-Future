@@ -19,6 +19,10 @@
 
 namespace dlaf::gpulapack {
 namespace kernels {
+__global__ void dummy() {}
+void dummy_host() {
+	dummy<<<1, 1, 0>>>();
+}
 
 using namespace dlaf::util::cuda_operators;
 
