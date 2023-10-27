@@ -24,7 +24,7 @@
 #include <dlaf/lapack/tile.h>
 #include <dlaf/matrix/distribution.h>
 #include <dlaf/matrix/index.h>
-#include <dlaf/matrix/matrix.h>
+#include <dlaf/matrix/matrix_ref.h>
 #include <dlaf/matrix/panel.h>
 #include <dlaf/matrix/tile.h>
 #include <dlaf/sender/traits.h>
@@ -128,7 +128,7 @@ void gemmTrailingMatrixTile(pika::execution::thread_priority priority, PanelTile
 
 // Local implementation of Lower Cholesky factorization.
 template <Backend backend, Device device, class T>
-void Cholesky<backend, device, T>::call_L(Matrix<T, device>& mat_a) {
+void Cholesky<backend, device, T>::call_L(dlaf::matrix::internal::MatrixRef<T, device> mat_a) {
   using namespace cholesky_l;
   using pika::execution::thread_priority;
 
@@ -169,7 +169,8 @@ void Cholesky<backend, device, T>::call_L(Matrix<T, device>& mat_a) {
 }
 
 template <Backend backend, Device device, class T>
-void Cholesky<backend, device, T>::call_L(comm::CommunicatorGrid grid, Matrix<T, device>& mat_a) {
+void Cholesky<backend, device, T>::call_L(comm::CommunicatorGrid grid,
+                                          dlaf::matrix::internal::MatrixRef<T, device> mat_a) {
   using namespace cholesky_l;
   using pika::execution::thread_priority;
 
@@ -273,7 +274,7 @@ void Cholesky<backend, device, T>::call_L(comm::CommunicatorGrid grid, Matrix<T,
 
 // Local implementation of Upper Cholesky factorization.
 template <Backend backend, Device device, class T>
-void Cholesky<backend, device, T>::call_U(Matrix<T, device>& mat_a) {
+void Cholesky<backend, device, T>::call_U(dlaf::matrix::internal::MatrixRef<T, device> mat_a) {
   using namespace cholesky_u;
   using pika::execution::thread_priority;
 
@@ -307,7 +308,8 @@ void Cholesky<backend, device, T>::call_U(Matrix<T, device>& mat_a) {
 }
 
 template <Backend backend, Device device, class T>
-void Cholesky<backend, device, T>::call_U(comm::CommunicatorGrid grid, Matrix<T, device>& mat_a) {
+void Cholesky<backend, device, T>::call_U(comm::CommunicatorGrid grid,
+                                          dlaf::matrix::internal::MatrixRef<T, device> mat_a) {
   using namespace cholesky_u;
   using pika::execution::thread_priority;
 
