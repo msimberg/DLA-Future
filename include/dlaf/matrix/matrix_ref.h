@@ -52,7 +52,8 @@ public:
   MatrixRef(Matrix<const T, D>& mat, const SubMatrixSpec& spec)
       : internal::MatrixBase(Distribution(mat.distribution(), spec)), mat_const_(mat) {}
 
-  MatrixRef(Matrix<const T, D>& mat) : internal::MatrixBase(mat.distribution()), mat_const_(mat) {}
+  MatrixRef(Matrix<const T, D>& mat)
+      : internal::MatrixBase(mat.distribution()), mat_const_(mat), sub_ref_(false) {}
 
   MatrixRef() = delete;
   MatrixRef(MatrixRef&&) = delete;
@@ -75,6 +76,10 @@ public:
   /// @pre index.isIn(globalNrTiles()).
   ReadOnlySenderType read(const GlobalTileIndex& index) {
     DLAF_ASSERT(index.isIn(distribution().nrTiles()), index, distribution().nrTiles());
+
+    if (!sub_ref_) {
+      return mat_const_.read(index);
+    }
 
     const auto parent_index(
         mat_const_.distribution().globalTileIndexFromSubDistribution(origin_, distribution(), index));
@@ -103,6 +108,7 @@ private:
 
 protected:
   GlobalElementIndex origin_{0, 0};
+  bool sub_ref_{true};
 };
 
 template <class T, Device D>
@@ -150,6 +156,10 @@ public:
   ReadWriteSenderType readwrite(const GlobalTileIndex& index) {
     DLAF_ASSERT(index.isIn(this->distribution().nrTiles()), index, this->distribution().nrTiles());
 
+    if (!sub_ref_) {
+      return mat_.readwrite(index);
+    }
+
     const auto parent_index(
         mat_.distribution().globalTileIndexFromSubDistribution(origin_, this->distribution(), index));
     auto tile_sender = mat_.readwrite(parent_index);
@@ -175,6 +185,7 @@ public:
 private:
   Matrix<T, D>& mat_;
   using MatrixRef<const T, D>::origin_;
+  using MatrixRef<const T, D>::sub_ref_;
 };
 
 // ETI
