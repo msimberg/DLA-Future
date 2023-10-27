@@ -50,8 +50,9 @@ public:
   /// @pre spec.size.isValid(),
   /// @pre spec.origin + spec.size <= mat.size().
   MatrixRef(Matrix<const T, D>& mat, const SubMatrixSpec& spec)
-      : internal::MatrixBase(Distribution(mat.distribution(), spec)), mat_const_(mat),
-        origin_(spec.origin) {}
+      : internal::MatrixBase(Distribution(mat.distribution(), spec)), mat_const_(mat) {}
+
+  MatrixRef(Matrix<const T, D>& mat) : internal::MatrixBase(mat.distribution()), mat_const_(mat) {}
 
   MatrixRef() = delete;
   MatrixRef(MatrixRef&&) = delete;
@@ -101,7 +102,7 @@ private:
   Matrix<const T, D>& mat_const_;
 
 protected:
-  GlobalElementIndex origin_;
+  GlobalElementIndex origin_{0, 0};
 };
 
 template <class T, Device D>
@@ -125,9 +126,11 @@ public:
   MatrixRef(Matrix<T, D>& mat, const SubMatrixSpec& spec)
       : MatrixRef<const T, D>(mat, spec), mat_(mat) {}
 
+  MatrixRef(Matrix<T, D>& mat) : MatrixRef<const T, D>(mat), mat_(mat) {}
+
   MatrixRef() = delete;
-  MatrixRef(MatrixRef&&) = delete;
-  MatrixRef(const MatrixRef&) = delete;
+  MatrixRef(MatrixRef&&) = default;
+  MatrixRef(const MatrixRef&) = default;
   MatrixRef& operator=(MatrixRef&&) = delete;
   MatrixRef& operator=(const MatrixRef&) = delete;
 
