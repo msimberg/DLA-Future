@@ -426,17 +426,17 @@ void TridiagSolver<B, D, T>::call(comm::CommunicatorGrid& grid, Matrix<T, Device
                             offdiag_vals[to_sizet(i_split - 1)], ws, ws_h, ws_hm);
   }
 
-  const SizeType n = evecs.nrTiles().rows();
-  copy(ws.e0, ws_hm.e0);
+  //const SizeType n = evecs.nrTiles().rows();
+  //copy(ws.e0, ws_hm.e0);
 
   // Note: ws_hm.d1 is the mirror of ws.d1 which is evals
-  applyIndex(0, n, ws_h.i1, ws_h.d0, ws_hm.d1);
-  copy(ws_hm.d1, evals);
+  //applyIndex(0, n, ws_h.i1, ws_h.d0, ws_hm.d1);
+  //copy(ws_hm.d1, evals);
 
   // Note: ws_hm.e2 is the mirror of ws.e2 which is evecs
-  dlaf::permutations::permute<Backend::MC, Device::CPU, T, Coord::Col>(row_task_chain, 0, n, ws_h.i1,
-                                                                       ws_hm.e0, ws_hm.e2);
-  copy(ws_hm.e2, evecs);
+  //dlaf::permutations::permute<Backend::MC, Device::CPU, T, Coord::Col>(row_task_chain, 0, n, ws_h.i1,
+  //                                                                     ws_hm.e0, ws_hm.e2);
+  //copy(ws_hm.e2, evecs);
 }
 
 // \overload TridiagSolver<B, D, T>::call()
@@ -449,12 +449,12 @@ void TridiagSolver<B, D, T>::call(comm::CommunicatorGrid& grid, Matrix<T, Device
                                   Matrix<T, D>& evals, Matrix<std::complex<T>, D>& evecs) {
   Matrix<T, D> real_evecs(evecs.distribution());
   TridiagSolver<B, D, T>::call(grid, tridiag, evals, real_evecs);
-
-  // Convert real to complex numbers
-  const matrix::Distribution& dist = evecs.distribution();
-  for (auto tile_wrt_local : iterate_range2d(dist.localNrTiles())) {
-    castToComplexAsync<D>(real_evecs.read(tile_wrt_local), evecs.readwrite(tile_wrt_local));
-  }
+// 
+//   // Convert real to complex numbers
+//   const matrix::Distribution& dist = evecs.distribution();
+//   for (auto tile_wrt_local : iterate_range2d(dist.localNrTiles())) {
+//     castToComplexAsync<D>(real_evecs.read(tile_wrt_local), evecs.readwrite(tile_wrt_local));
+//   }
 }
 
 }

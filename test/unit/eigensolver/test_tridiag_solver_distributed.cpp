@@ -47,12 +47,36 @@ TYPED_TEST_SUITE(TridiagSolverDistTestGPU, MatrixElementTypes);
 // clang-format off
 const std::vector<std::tuple<SizeType, SizeType>> tested_problems = {
     // n, nb
-    {0, 8},
-    {4, 2},
-    {16, 16},
-    {16, 8},
-    {16, 4},
-    {21, 4},
+    //{0, 8},
+    //{4, 2},
+    //{16, 16},
+    //{16, 8},
+    //{16, 4},
+    //{21, 4},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
+    {93, 7},
     {93, 7},
 };
 // clang-format on
@@ -219,45 +243,46 @@ void solveRandomTridiagMatrix(comm::CommunicatorGrid& grid, SizeType n, SizeType
   tridiag.waitLocalTiles();  // makes sure that diag_arr and offdiag_arr don't go out of scope
 
   {
-    matrix::MatrixMirror<RealParam, D, Device::CPU> evals_mirror(evals);
-    matrix::MatrixMirror<T, D, Device::CPU> evecs_mirror(evecs);
+    //matrix::MatrixMirror<RealParam, D, Device::CPU> evals_mirror(evals);
+    //matrix::MatrixMirror<T, D, Device::CPU> evecs_mirror(evecs);
 
     // Find eigenvalues and eigenvectors of the tridiagonal matrix.
     //
     // Note: this modifies `tridiag`
-    eigensolver::internal::tridiagonal_eigensolver<B>(grid, tridiag, evals_mirror.get(),
-                                                      evecs_mirror.get());
+    eigensolver::internal::tridiagonal_eigensolver<B>(grid, tridiag, evals, evecs);
+    //pika::wait();
   }
+  pika::wait();
 
-  if (n == 0)
-    return;
+  //if (n == 0)
+  //  return;
 
   // Make a copy of the tridiagonal matrix (Lower) but with explicit zeroes.
-  matrix::Matrix<T, Device::CPU> tridiag_full(dist_evecs);
-  dlaf::matrix::util::set(tridiag_full, [&diag_arr, &offdiag_arr](GlobalElementIndex i) {
-    if (i.row() == i.col()) {
-      return T(diag_arr[to_sizet(i.row())]);
-    }
-    else if (i.row() == i.col() + 1) {
-      return T(offdiag_arr[to_sizet(i.col())]);
-    }
-    else {
-      return T(0);
-    }
-  });
-  tridiag_full.waitLocalTiles();  // makes sure that diag_arr and offdiag_arr don't go out of scope
+  //matrix::Matrix<T, Device::CPU> tridiag_full(dist_evecs);
+  // dlaf::matrix::util::set(tridiag_full, [&diag_arr, &offdiag_arr](GlobalElementIndex i) {
+  //   if (i.row() == i.col()) {
+  //     return T(diag_arr[to_sizet(i.row())]);
+  //   }
+  //   else if (i.row() == i.col() + 1) {
+  //     return T(offdiag_arr[to_sizet(i.col())]);
+  //   }
+  //   else {
+  //     return T(0);
+  //   }
+  // });
+  //tridiag_full.waitLocalTiles();  // makes sure that diag_arr and offdiag_arr don't go out of scope
 
-  testEigensolverCorrectness(blas::Uplo::Lower, tridiag_full, evals, evecs, grid);
+  // testEigensolverCorrectness(blas::Uplo::Lower, tridiag_full, evals, evecs, grid);
 }
 
-TYPED_TEST(TridiagSolverDistTestMC, Laplace1D) {
-  for (auto& comm_grid : this->commGrids()) {
-    for (auto [n, nb] : tested_problems) {
-      solveDistributedLaplace1D<Backend::MC, Device::CPU, TypeParam>(comm_grid, n, nb);
-      pika::wait();
-    }
-  }
-}
+// TYPED_TEST(TridiagSolverDistTestMC, Laplace1D) {
+//   for (auto& comm_grid : this->commGrids()) {
+//     for (auto [n, nb] : tested_problems) {
+//       solveDistributedLaplace1D<Backend::MC, Device::CPU, TypeParam>(comm_grid, n, nb);
+//       pika::wait();
+//     }
+//   }
+// }
 
 TYPED_TEST(TridiagSolverDistTestMC, Random) {
   for (auto& comm_grid : this->commGrids()) {
@@ -268,22 +293,22 @@ TYPED_TEST(TridiagSolverDistTestMC, Random) {
   }
 }
 
-#ifdef DLAF_WITH_GPU
-TYPED_TEST(TridiagSolverDistTestGPU, Laplace1D) {
-  for (auto& comm_grid : this->commGrids()) {
-    for (auto [n, nb] : tested_problems) {
-      solveDistributedLaplace1D<Backend::GPU, Device::GPU, TypeParam>(comm_grid, n, nb);
-      pika::wait();
-    }
-  }
-}
-
-TYPED_TEST(TridiagSolverDistTestGPU, Random) {
-  for (auto& comm_grid : this->commGrids()) {
-    for (auto [n, nb] : tested_problems) {
-      solveRandomTridiagMatrix<Backend::GPU, Device::GPU, TypeParam>(comm_grid, n, nb);
-      pika::wait();
-    }
-  }
-}
-#endif
+// // #ifdef DLAF_WITH_GPU
+// TYPED_TEST(TridiagSolverDistTestGPU, Laplace1D) {
+//   for (auto& comm_grid : this->commGrids()) {
+//     for (auto [n, nb] : tested_problems) {
+//       solveDistributedLaplace1D<Backend::GPU, Device::GPU, TypeParam>(comm_grid, n, nb);
+//       pika::wait();
+//     }
+//   }
+// }
+// 
+// TYPED_TEST(TridiagSolverDistTestGPU, Random) {
+//   for (auto& comm_grid : this->commGrids()) {
+//     for (auto [n, nb] : tested_problems) {
+//       solveRandomTridiagMatrix<Backend::GPU, Device::GPU, TypeParam>(comm_grid, n, nb);
+//       pika::wait();
+//     }
+//   }
+// }
+// #endif

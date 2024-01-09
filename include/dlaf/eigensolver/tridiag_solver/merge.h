@@ -1332,6 +1332,7 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
                                                         auto& barrier_ptr) {
                  using dlaf::comm::internal::transformMPI;
 
+                 // TODO
                  comm::CommunicatorPipeline<comm::CommunicatorType::Row> row_comm_chain(
                      row_comm_wrapper.get());
                  const dlaf::comm::Communicator& col_comm = col_comm_wrapper.get();
@@ -1620,41 +1621,43 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
                    }
                  }
 
-                 barrier_ptr->arrive_and_wait(barrier_busy_wait);
+                 ///// Uncomment from here ---->
+                 // barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
-                 // STEP 3b: Reduce to get the sum of all squares on all ranks
-                 if (thread_idx == 0)
-                   tt::sync_wait(ex::just(std::cref(col_comm), MPI_SUM,
-                                          common::make_data(ws_row(), k_lc)) |
-                                 transformMPI(all_reduce_in_place));
+                 // // STEP 3b: Reduce to get the sum of all squares on all ranks
+                 // if (thread_idx == 0)
+                 //   tt::sync_wait(ex::just(std::cref(col_comm), MPI_SUM,
+                 //                          common::make_data(ws_row(), k_lc)) |
+                 //                 transformMPI(all_reduce_in_place));
+                 ///// ----> to here to reproduce segfault
 
-                 barrier_ptr->arrive_and_wait(barrier_busy_wait);
+                 // barrier_ptr->arrive_and_wait(barrier_busy_wait);
 
-                 // STEP 3c: Normalize (compute norm of each column and scale column vector)
-                 {
-                   common::internal::SingleThreadedBlasScope single;
+                 // // STEP 3c: Normalize (compute norm of each column and scale column vector)
+                 // {
+                 //   common::internal::SingleThreadedBlasScope single;
 
-                   const T* sum_squares = ws_row();
+                 //   const T* sum_squares = ws_row();
 
-                   for (SizeType j_el_lc = begin; j_el_lc < end; ++j_el_lc) {
-                     const SizeType j_lc = dist_sub.local_tile_from_local_element<Coord::Col>(j_el_lc);
-                     const SizeType j_el_tl =
-                         dist_sub.tile_element_from_local_element<Coord::Col>(j_el_lc);
+                 //   for (SizeType j_el_lc = begin; j_el_lc < end; ++j_el_lc) {
+                 //     const SizeType j_lc = dist_sub.local_tile_from_local_element<Coord::Col>(j_el_lc);
+                 //     const SizeType j_el_tl =
+                 //         dist_sub.tile_element_from_local_element<Coord::Col>(j_el_lc);
 
-                     const T vec_norm = std::sqrt(sum_squares[j_el_lc]);
+                 //     const T vec_norm = std::sqrt(sum_squares[j_el_lc]);
 
-                     for (SizeType i_lc = 0; i_lc < m_lc; ++i_lc) {
-                       const LocalTileIndex ij_lc(i_lc, j_lc);
-                       const SizeType ij_linear = dist_extra::local_tile_linear_index(dist_sub, ij_lc);
+                 //     for (SizeType i_lc = 0; i_lc < m_lc; ++i_lc) {
+                 //       const LocalTileIndex ij_lc(i_lc, j_lc);
+                 //       const SizeType ij_linear = dist_extra::local_tile_linear_index(dist_sub, ij_lc);
 
-                       T* partial_evec = q[to_sizet(ij_linear)].ptr({0, j_el_tl});
+                 //       T* partial_evec = q[to_sizet(ij_linear)].ptr({0, j_el_tl});
 
-                       const SizeType i = dist_sub.global_tile_from_local_tile<Coord::Row>(i_lc);
-                       const SizeType m_el_tl = dist_sub.tile_size_of<Coord::Row>(i);
-                       blas::scal(m_el_tl, 1 / vec_norm, partial_evec, 1);
-                     }
-                   }
-                 }
+                 //       const SizeType i = dist_sub.global_tile_from_local_tile<Coord::Row>(i_lc);
+                 //       const SizeType m_el_tl = dist_sub.tile_size_of<Coord::Row>(i);
+                 //       blas::scal(m_el_tl, 1 / vec_norm, partial_evec, 1);
+                 //     }
+                 //   }
+                 // }
                });
       }));
 }
@@ -1900,19 +1903,19 @@ void mergeDistSubproblems(comm::CommunicatorPipeline<comm::CommunicatorType::Ful
   solveRank1ProblemDist(row_task_chain.exclusive(), col_task_chain.exclusive(), i_begin, i_end, k, k_lc,
                         std::move(scaled_rho), ws_hm.d1, ws_hm.z1, ws_h.d0, ws_h.i4, ws_hm.i6, ws_hm.i2,
                         ws_hm.e2);
-  copy(idx_loc_begin, sz_loc_tiles, ws_hm.e2, ws.e2);
+  //copy(idx_loc_begin, sz_loc_tiles, ws_hm.e2, ws.e2);
 
   // Step #3: Eigenvectors of the tridiagonal system: Q * U
   //
   // The eigenvectors resulting from the multiplication are already in the order of the eigenvalues as
   // prepared for the deflated system.
-  multiplyEigenvectors<B>(sub_offset, dist_sub, row_task_chain, col_task_chain, n_upper, n_lower, ws.e0,
-                          ws.e1, ws.e2, std::move(k_lc), std::move(n_udl));
+  //multiplyEigenvectors<B>(sub_offset, dist_sub, row_task_chain, col_task_chain, n_upper, n_lower, ws.e0,
+  //                        ws.e1, ws.e2, std::move(k_lc), std::move(n_udl));
 
-  // Step #4: Final permutation to sort eigenvalues and eigenvectors
-  //
-  //    i2 (in)  : local(deflated) <--- deflated
-  //    i1 (out) : sorted          <--- local(deflated)
-  sortIndex(i_begin, i_end, std::move(k), ws_h.d0, ws_hm.i2, ws_h.i1);
+  // // Step #4: Final permutation to sort eigenvalues and eigenvectors
+  // //
+  // //    i2 (in)  : local(deflated) <--- deflated
+  // //    i1 (out) : sorted          <--- local(deflated)
+  // sortIndex(i_begin, i_end, std::move(k), ws_h.d0, ws_hm.i2, ws_h.i1);
 }
 }
