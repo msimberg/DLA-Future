@@ -1296,7 +1296,8 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
 
   const auto hp_scheduler = di::getBackendScheduler<Backend::MC>(thread_priority::high);
   ex::start_detached(
-      ex::when_all(std::forward<KSender>(k), std::forward<KLcSender>(k_lc), std::forward<RhoSender>(rho),
+      ex::when_all(ex::just(row_comm_chain.sub_pipeline()), ex::just(col_comm_chain.sub_pipeline()),
+                   std::forward<KSender>(k), std::forward<KLcSender>(k_lc), std::forward<RhoSender>(rho),
                    ex::when_all_vector(tc.read(d)), ex::when_all_vector(tc.readwrite(z)),
                    ex::when_all_vector(tc.readwrite(evals)), ex::when_all_vector(tc.read(i4)),
                    ex::when_all_vector(tc.read(i6)), ex::when_all_vector(tc.read(i2)),
@@ -1305,11 +1306,11 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
                    ex::just(std::vector<memory::MemoryView<T, Device::CPU>>()),
                    ex::just(memory::MemoryView<T, Device::CPU>())) |
       ex::transfer(hp_scheduler) |
-      ex::let_value([n, dist_sub, bcast_evals, all_reduce_in_place, hp_scheduler, row_comm_subchain = row_comm_chain.sub_pipeline(), col_comm_subchain = col_comm_chain.sub_pipeline()](
-                        const SizeType k,
+      ex::let_value([n, dist_sub, bcast_evals, all_reduce_in_place, hp_scheduler](
+                        auto& row_comm_chain, auto& col_comm_chain, const SizeType k,
                         const SizeType k_lc, const auto& rho, const auto& d_tiles, auto& z_tiles,
                         const auto& eval_tiles, const auto& i4_tiles_arr, const auto& i6_tiles_arr,
-                        const auto& i2_tiles_arr, const auto& evec_tiles, auto& ws_cols, auto& ws_row) mutable {
+                        const auto& i2_tiles_arr, const auto& evec_tiles, auto& ws_cols, auto& ws_row) {
         using pika::execution::thread_priority;
 
         const std::size_t nthreads = [dist_sub, k_lc] {
@@ -1324,7 +1325,7 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
         }();
 
         return ex::just(std::make_unique<pika::barrier<>>(nthreads)) | ex::transfer(hp_scheduler) |
-               ex::bulk(nthreads, [&row_comm_subchain, &col_comm_subchain, k, k_lc, &rho, &d_tiles,
+               ex::bulk(nthreads, [&row_comm_chain, &col_comm_chain, k, k_lc, &rho, &d_tiles,
                                    &z_tiles, &eval_tiles, &i4_tiles_arr, &i6_tiles_arr, &i2_tiles_arr,
                                    &evec_tiles, &ws_cols, &ws_row, nthreads, n, dist_sub, bcast_evals,
                                    all_reduce_in_place](const std::size_t thread_idx,
@@ -1443,7 +1444,7 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
                  // Note: this ensures that evals broadcasting finishes before bulk releases resources
                  ScopedSenderWait bcast_barrier;
                  if (thread_idx == 0)
-                   bcast_barrier.sender_ = bcast_evals(row_comm_subchain, eval_tiles);
+                   bcast_barrier.sender_ = bcast_evals(row_comm_chain, eval_tiles);
 
                  // Note: laed4 handles k <= 2 cases differently
                  if (k <= 2)
@@ -1545,7 +1546,7 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
                      }
                    }
 
-                   tt::sync_wait(ex::when_all(row_comm_subchain.exclusive(),
+                   tt::sync_wait(ex::when_all(row_comm_chain.exclusive(),
                                               ex::just(MPI_PROD, common::make_data(w, m_el_lc))) |
                                  transformMPI(all_reduce_in_place));
 
@@ -1623,7 +1624,7 @@ void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Ro
 
                  // STEP 3b: Reduce to get the sum of all squares on all ranks
                  if (thread_idx == 0)
-                   tt::sync_wait(ex::when_all(col_comm_subchain.exclusive(), ex::just(MPI_SUM,
+                   tt::sync_wait(ex::when_all(col_comm_chain.exclusive(), ex::just(MPI_SUM,
                                           common::make_data(ws_row(), k_lc))) |
                                  transformMPI(all_reduce_in_place));
 
