@@ -1236,8 +1236,8 @@ struct ScopedSenderWait {
   }
 };
 
-template <class T, class CommSender, class KSender, class KLcSender, class RhoSender>
-void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const SizeType i_begin,
+template <class T, class KSender, class KLcSender, class RhoSender>
+void solveRank1ProblemDist(comm::CommunicatorPipeline<comm::CommunicatorType::Row>& row_comm_chain, comm::CommunicatorPipeline<comm::CommunicatorType::Col>& col_comm_chain, const SizeType i_begin,
                            const SizeType i_end, KSender&& k, KLcSender&& k_lc, RhoSender&& rho,
                            Matrix<const T, Device::CPU>& d, Matrix<T, Device::CPU>& z,
                            Matrix<T, Device::CPU>& evals, Matrix<const SizeType, Device::CPU>& i4,
@@ -1296,8 +1296,7 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
 
   const auto hp_scheduler = di::getBackendScheduler<Backend::MC>(thread_priority::high);
   ex::start_detached(
-      ex::when_all(std::forward<CommSender>(row_comm), std::forward<CommSender>(col_comm),
-                   std::forward<KSender>(k), std::forward<KLcSender>(k_lc), std::forward<RhoSender>(rho),
+      ex::when_all(std::forward<KSender>(k), std::forward<KLcSender>(k_lc), std::forward<RhoSender>(rho),
                    ex::when_all_vector(tc.read(d)), ex::when_all_vector(tc.readwrite(z)),
                    ex::when_all_vector(tc.readwrite(evals)), ex::when_all_vector(tc.read(i4)),
                    ex::when_all_vector(tc.read(i6)), ex::when_all_vector(tc.read(i2)),
@@ -1306,11 +1305,11 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
                    ex::just(std::vector<memory::MemoryView<T, Device::CPU>>()),
                    ex::just(memory::MemoryView<T, Device::CPU>())) |
       ex::transfer(hp_scheduler) |
-      ex::let_value([n, dist_sub, bcast_evals, all_reduce_in_place, hp_scheduler](
-                        auto& row_comm_wrapper, auto& col_comm_wrapper, const SizeType k,
+      ex::let_value([n, dist_sub, bcast_evals, all_reduce_in_place, hp_scheduler, row_comm_subchain = row_comm_chain.sub_pipeline(), col_comm_subchain = col_comm_chain.sub_pipeline()](
+                        const SizeType k,
                         const SizeType k_lc, const auto& rho, const auto& d_tiles, auto& z_tiles,
                         const auto& eval_tiles, const auto& i4_tiles_arr, const auto& i6_tiles_arr,
-                        const auto& i2_tiles_arr, const auto& evec_tiles, auto& ws_cols, auto& ws_row) {
+                        const auto& i2_tiles_arr, const auto& evec_tiles, auto& ws_cols, auto& ws_row) mutable {
         using pika::execution::thread_priority;
 
         const std::size_t nthreads = [dist_sub, k_lc] {
@@ -1325,16 +1324,16 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
         }();
 
         return ex::just(std::make_unique<pika::barrier<>>(nthreads)) | ex::transfer(hp_scheduler) |
-               ex::bulk(nthreads, [&row_comm_wrapper, &col_comm_wrapper, k, k_lc, &rho, &d_tiles,
+               ex::bulk(nthreads, [&row_comm_subchain, &col_comm_subchain, k, k_lc, &rho, &d_tiles,
                                    &z_tiles, &eval_tiles, &i4_tiles_arr, &i6_tiles_arr, &i2_tiles_arr,
                                    &evec_tiles, &ws_cols, &ws_row, nthreads, n, dist_sub, bcast_evals,
                                    all_reduce_in_place](const std::size_t thread_idx,
                                                         auto& barrier_ptr) {
                  using dlaf::comm::internal::transformMPI;
 
-                 comm::CommunicatorPipeline<comm::CommunicatorType::Row> row_comm_chain(
-                     row_comm_wrapper.get());
-                 const dlaf::comm::Communicator& col_comm = col_comm_wrapper.get();
+                 // comm::CommunicatorPipeline<comm::CommunicatorType::Row> row_comm_chain(
+                 //     row_comm_wrapper.get());
+                 // const dlaf::comm::Communicator& col_comm = col_comm_wrapper.get();
 
                  const SizeType m_lc = dist_sub.local_nr_tiles().rows();
                  const SizeType m_el_lc = dist_sub.local_size().rows();
@@ -1444,7 +1443,7 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
                  // Note: this ensures that evals broadcasting finishes before bulk releases resources
                  ScopedSenderWait bcast_barrier;
                  if (thread_idx == 0)
-                   bcast_barrier.sender_ = bcast_evals(row_comm_chain, eval_tiles);
+                   bcast_barrier.sender_ = bcast_evals(row_comm_subchain, eval_tiles);
 
                  // Note: laed4 handles k <= 2 cases differently
                  if (k <= 2)
@@ -1546,7 +1545,7 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
                      }
                    }
 
-                   tt::sync_wait(ex::when_all(row_comm_chain.exclusive(),
+                   tt::sync_wait(ex::when_all(row_comm_subchain.exclusive(),
                                               ex::just(MPI_PROD, common::make_data(w, m_el_lc))) |
                                  transformMPI(all_reduce_in_place));
 
@@ -1624,8 +1623,8 @@ void solveRank1ProblemDist(CommSender&& row_comm, CommSender&& col_comm, const S
 
                  // STEP 3b: Reduce to get the sum of all squares on all ranks
                  if (thread_idx == 0)
-                   tt::sync_wait(ex::just(std::cref(col_comm), MPI_SUM,
-                                          common::make_data(ws_row(), k_lc)) |
+                   tt::sync_wait(ex::when_all(col_comm_subchain.exclusive(), ex::just(MPI_SUM,
+                                          common::make_data(ws_row(), k_lc))) |
                                  transformMPI(all_reduce_in_place));
 
                  barrier_ptr->arrive_and_wait(barrier_busy_wait);
@@ -1897,7 +1896,7 @@ void mergeDistSubproblems(comm::CommunicatorPipeline<comm::CommunicatorType::Ful
   // set0 is required because deflated eigenvectors rows won't be touched in rank1 and so they will be
   // neutral when used in GEMM (copy will take care of them later)
   matrix::util::set0<Backend::MC>(thread_priority::normal, idx_loc_begin, sz_loc_tiles, ws_hm.e2);
-  solveRank1ProblemDist(row_task_chain.exclusive(), col_task_chain.exclusive(), i_begin, i_end, k, k_lc,
+  solveRank1ProblemDist(row_task_chain, col_task_chain, i_begin, i_end, k, k_lc,
                         std::move(scaled_rho), ws_hm.d1, ws_hm.z1, ws_h.d0, ws_h.i4, ws_hm.i6, ws_hm.i2,
                         ws_hm.e2);
   copy(idx_loc_begin, sz_loc_tiles, ws_hm.e2, ws.e2);
