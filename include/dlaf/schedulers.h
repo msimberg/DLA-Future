@@ -11,6 +11,8 @@
 
 /// @file
 
+#include <exec/static_thread_pool.hpp>
+
 #include <pika/execution.hpp>
 #include <pika/runtime.hpp>
 #include <pika/thread.hpp>
@@ -24,6 +26,10 @@
 #include <dlaf/types.h>
 
 namespace dlaf::internal {
+void init_stdexec_static_thread_pool();
+void finalize_stdexec_static_thread_pool();
+exec::static_thread_pool::scheduler get_stdexec_static_thread_pool_scheduler();
+
 template <Backend backend>
 auto getBackendScheduler(
     const pika::execution::thread_priority priority = pika::execution::thread_priority::default_,
@@ -33,10 +39,11 @@ auto getBackendScheduler(
   using pika::execution::thread_stacksize;
 
   if constexpr (backend == Backend::MC) {
-    return ex::with_stacksize(
-        ex::with_priority(ex::thread_pool_scheduler{&pika::resource::get_thread_pool("default")},
-                          priority),
-        stacksize);
+    // return ex::with_stacksize(
+    //     ex::with_priority(ex::thread_pool_scheduler{&pika::resource::get_thread_pool("default")},
+    //                       priority),
+    //     stacksize);
+    return get_stdexec_static_thread_pool_scheduler();
   }
 #ifdef DLAF_WITH_GPU
   else if constexpr (backend == Backend::GPU) {

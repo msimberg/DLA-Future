@@ -198,13 +198,11 @@ struct choleskyMiniapp {
   }
 };
 
+std::unique_ptr<Options> opts;
+
 int pika_main(pika::program_options::variables_map& vm) {
-  pika::scoped_finalize pika_finalizer;
-  dlaf::ScopedInitializer init(vm);
-
-  const Options opts(vm);
-  dlaf::miniapp::dispatchMiniapp<choleskyMiniapp>(opts);
-
+  dlaf::initialize(vm);
+  opts = std::make_unique<Options>(vm);
   return EXIT_SUCCESS;
 }
 
@@ -229,7 +227,15 @@ int main(int argc, char** argv) {
   pika::init_params p;
   p.desc_cmdline = desc_commandline;
   p.rp_callback = dlaf::initResourcePartitionerHandler;
-  return pika::init(pika_main, argc, argv, p);
+  pika::start(pika_main, argc, argv, p);
+  pika::suspend();
+
+  dlaf::miniapp::dispatchMiniapp<choleskyMiniapp>(*opts);
+
+  pika::resume();
+  dlaf::finalize();
+  pika::finalize();
+  return pika::stop();
 }
 
 namespace {

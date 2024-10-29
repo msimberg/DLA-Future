@@ -19,12 +19,15 @@
 #include <optional>
 #include <string>
 
+#include <exec/static_thread_pool.hpp>
+
 #include <pika/runtime.hpp>
 
 #include <dlaf/common/assert.h>
 #include <dlaf/communication/error.h>
 #include <dlaf/init.h>
 #include <dlaf/memory/memory_chunk.h>
+#include <dlaf/schedulers.h>
 #include <dlaf/tune.h>
 
 namespace dlaf {
@@ -58,11 +61,13 @@ struct Init {
 template <>
 struct Init<Backend::MC> {
   static void initialize(const configuration& cfg) {
+    dlaf::internal::init_stdexec_static_thread_pool();
     memory::internal::initializeUmpireHostAllocator(cfg.umpire_host_memory_pool_initial_bytes);
   }
 
   static void finalize() {
     memory::internal::finalizeUmpireHostAllocator();
+    dlaf::internal::finalize_stdexec_static_thread_pool();
   }
 };
 
