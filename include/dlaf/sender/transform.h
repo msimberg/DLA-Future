@@ -53,18 +53,19 @@ template <TransformDispatchType Tag = TransformDispatchType::Plain, Backend B = 
           typename F = void, typename Sender = void,
           typename = std::enable_if_t<pika::execution::experimental::is_sender_v<Sender>>>
 [[nodiscard]] decltype(auto) transform(const Policy<B> policy, F&& f, Sender&& sender) {
+  using dlaf::common::internal::ConsumeRvalues;
+  using dlaf::common::internal::Unwrapping;
   using pika::execution::experimental::drop_operation_state;
   using pika::execution::experimental::then;
   using pika::execution::experimental::transfer;
+  using pika::execution::thread_stacksize;
 
   auto scheduler = getBackendScheduler<B>(policy.priority(), policy.stacksize());
-  auto transfer_sender = transfer(std::forward<Sender>(sender), std::move(scheduler));
-
-  using dlaf::common::internal::ConsumeRvalues;
-  using dlaf::common::internal::Unwrapping;
 
   if constexpr (B == Backend::MC) {
-    return then(std::move(transfer_sender), ConsumeRvalues{Unwrapping{std::forward<F>(f)}}) |
+    return std::forward<Sender>(sender) |
+           transfer(std::move(scheduler)) |
+           then(ConsumeRvalues{Unwrapping{std::forward<F>(f)}}) |
            drop_operation_state();
   }
   else if constexpr (B == Backend::GPU) {
@@ -72,6 +73,11 @@ template <TransformDispatchType Tag = TransformDispatchType::Plain, Backend B = 
     using pika::cuda::experimental::then_with_cublas;
     using pika::cuda::experimental::then_with_cusolver;
     using pika::cuda::experimental::then_with_stream;
+
+    auto scheduler_mc = getBackendScheduler<Backend::MC>(policy.priority(), thread_stacksize::nostack);
+    auto transfer_sender = std::forward<Sender>(sender) |
+           transfer(std::move(scheduler_mc)) |
+           transfer(std::move(scheduler));
 
     if constexpr (Tag == TransformDispatchType::Plain) {
       return then_with_stream(std::move(transfer_sender),
