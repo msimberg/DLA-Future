@@ -18,3 +18,4 @@ include:
   # - local: 'ci/rocm/clang14_release.yml'
   # - local: 'ci/rocm/clang14_release_stdexec.yml'
   - local: 'ci/rocm/clang15_release_stdexec.yml'
+  - local: 'ci/rocm/clang18_release_stdexec.yml'
